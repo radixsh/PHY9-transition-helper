@@ -105,30 +105,54 @@ async def find(ctx, *, role):
     return
 
 @client.command()
-async def duplicate(ctx, *, old_category: discord.CategoryChannel):
-    # Ensure channel category exists
-    if old_category not in ctx.message.guild.categories:
-        return await ctx.send("No such category found")
-    print(f"Category provided: {old_category}")
-    
-    # old_overwrites = old_category.overwrites
-    # print(f"Old overwrites: {old_overwrites}")
-    overwrites = {
-            ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            # allow the role from the old category to access the new category
-    }
-    new_category = await ctx.guild.create_category(f"{old_category}",
-            overwrites=overwrites)
-    print(f"New category: {new_category}")
-   
-    for channel in old_category.channels:
-        print(f"Channel in old category: {channel}")
-        new_channel = await new_category.create_text_channel(channel.name)
-        # Make the new channel private by default
-        await new_channel.set_permissions(ctx.guild.default_role, send_messages=False)
-        await channel.delete()
-    await old_category.delete()
+async def duplicate(ctx, *, arg):
+    # TODO: Redo this all with querying by id instead of string name
+
+    # Can't think of a more elegant way at this moment...
+    old = ""
+    stop = True
+    for category in ctx.guild.categories:
+        if arg == category.name:
+            old = category 
+            stop = False 
+            break
+    if stop:
+        return await ctx.send(f"No such category found")
+
+    # Copy the old category's roles/perms to the new category
+    new = await ctx.guild.create_category(f"{old.name} duplicate",
+            overwrites=old.overwrites)
+    print(f"new ({type(new)}): {new}")
+
+    for c in old.channels:
+        if not c.permissions_synced:
+            overwrites = c.overwrites
+        else:
+            overwrites = old.overwrites
+
+        clone = await c.clone() 
+        await clone.edit(category=new)
+        print(clone)
+        # await c.delete()
+
+    # await old.delete()
 
     return await ctx.send("Done")
+
+@client.command()
+async def erase(ctx, *, arg):
+    to_erase = ""
+    stop = True
+    for category in ctx.guild.categories:
+        if arg == category.name:
+            to_erase = category 
+            stop = False 
+            break
+    if stop:
+        return await ctx.send(f"No such category found")
+
+    for c in to_erase.channels:
+        await c.delete()
+    await to_erase.delete()
 
 client.run(TOKEN)
