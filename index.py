@@ -75,7 +75,7 @@ async def find(ctx, *, role):
     return
 
 
-@client.command(aliases=['dup', 'clone']))
+@client.command(aliases=['dup', 'clone'])
 async def duplicate(ctx, *, arg):
     # TODO: Redo this all with querying by id instead of string name
 
