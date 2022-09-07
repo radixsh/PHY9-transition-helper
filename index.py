@@ -5,6 +5,7 @@ from env import TOKEN, PREFIX
 intents = discord.Intents.all()
 client = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
+
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user}!')
@@ -15,11 +16,13 @@ async def on_ready():
     for guild in client.guilds:
         print(f"- {guild.name} ({guild.member_count} members)")
 
+
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
     await client.process_commands(message)
+
 
 @client.command(aliases=['h'])
 async def help(ctx):
@@ -27,51 +30,18 @@ async def help(ctx):
             description=f"Role/channel/category duplicator bot",
             color=0xb2558d)
     embed.add_field(name=f'`{PREFIX}duplicate some channel category here`',
-            value=f'Duplicates channel category and its roles/permissions',
+            value=f'Duplicates channel category and its channels and '
+                    'roles/permissions',
+            inline=False)
+    embed.add_field(name=f'`{PREFIX}erase some channel category here`',
+            value=f'Erases channel category and its channels',
+            inline=False)
+    embed.add_field(name=f'`{PREFIX}find some role`',
+            value=f'Shows a list of people with the specified role',
             inline=False)
     embed.set_footer(text="Contact radix#9084 with issues.")
     return await ctx.send(embed=embed)
 
-@client.command(aliases=['up', 'u'])
-async def uptime(ctx):
-    current_time = datetime.now()
-    delta = int((current_time - start_time).total_seconds())
-    d, rem = divmod(delta, 24 * 60 * 60)
-    h, rem = divmod(rem, 60 * 60)
-    m, s = divmod(rem, 60)
-    uptime = f"Uptime: `{d} day{'' if d == 1 else 's'}, "
-    uptime += f"{h} hour{'' if h == 1 else 's'}, "
-    uptime += f"{m} minute{'' if m == 1 else 's'}, "
-    uptime += f"{s} second{'' if s == 1 else 's'}`"
-    await ctx.send(uptime)
-
-@client.command(aliases=['l'])
-async def list(ctx, *args):
-    ALL_ROLES = {}
-
-    for m in ctx.guild.members:
-        for role in m.roles:
-            if role.name != "@everyone":
-                if role.name in ALL_ROLES:
-                    ALL_ROLES[role.name].append(f'`{m.name}#{m.discriminator}`')
-                else:
-                    ALL_ROLES[role.name] = [f'`{m.name}#{m.discriminator}`']
-
-    for role in ALL_ROLES:
-        long_list = f'**{role}**: {", ".join(ALL_ROLES[role])}\n'
-        if len(long_list) < 2000:
-            await ctx.send(long_list)
-        else:
-            parts = []
-            for i in range(0, len(long_list), 1000):
-                parts.append(long_list[i:i+1000])
-            if len(parts) > 3:
-                await ctx.send(f'(**{role}** has too many people in it to '
-                        'list)')
-            else:
-                for part in parts:
-                    await ctx.send(part)
-    return
 
 @client.command(aliases=['f'])
 async def find(ctx, *, role):
@@ -104,7 +74,8 @@ async def find(ctx, *, role):
             print(f'Failed to ctx.send: {long_list[i:temp]}')
     return
 
-@client.command()
+
+@client.command(aliases=['dup', 'clone']))
 async def duplicate(ctx, *, arg):
     # TODO: Redo this all with querying by id instead of string name
 
@@ -139,7 +110,8 @@ async def duplicate(ctx, *, arg):
 
     return await ctx.send("Done")
 
-@client.command()
+
+@client.command(aliases=['remove', 'delete', 'purge', 'nuke'])
 async def erase(ctx, *, arg):
     to_erase = ""
     stop = True
@@ -154,5 +126,7 @@ async def erase(ctx, *, arg):
     for c in to_erase.channels:
         await c.delete()
     await to_erase.delete()
+    
+    return await ctx.send("Done")
 
 client.run(TOKEN)
