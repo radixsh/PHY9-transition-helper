@@ -29,7 +29,7 @@ async def help(ctx):
     embed = discord.Embed(title=f"Bot prefix: `{PREFIX}`",
             description=f"Role/channel/category duplicator bot",
             color=0xb2558d)
-    embed.add_field(name=f'`{PREFIX}duplicate some channel category here`',
+    embed.add_field(name=f'`{PREFIX}dup[licate] some channel category here`',
             value=f'Duplicates channel category and its channels and '
                     'roles/permissions',
             inline=False)
@@ -77,23 +77,20 @@ async def find(ctx, *, role):
 
 @client.command(aliases=['dup', 'clone'])
 async def duplicate(ctx, *, arg):
-    # TODO: Redo this all with querying by id instead of string name
-
-    # Can't think of a more elegant way at this moment...
     old = ""
     stop = True
     for category in ctx.guild.categories:
-        if arg == category.name:
-            old = category 
+        if arg.lower() == category.name.lower():
+            old = category
             stop = False 
             break
     if stop:
         return await ctx.send(f"No such category found")
 
     # Copy the old category's roles/perms to the new category
-    new = await ctx.guild.create_category(f"{old.name} duplicate",
-            overwrites=old.overwrites)
-    print(f"new ({type(new)}): {new}")
+    new = await ctx.guild.create_category(f"{old.name}",
+            overwrites=old.overwrites,
+            position=old.position)
 
     for c in old.channels:
         if not c.permissions_synced:
@@ -103,12 +100,51 @@ async def duplicate(ctx, *, arg):
 
         clone = await c.clone() 
         await clone.edit(category=new)
-        print(clone)
-        # await c.delete()
+    
+    await old.edit(name=f"{old.name} [Archived by Duplicator]", position=1000)
 
-    # await old.delete()
+    return await ctx.send("Done :3")
 
-    return await ctx.send("Done")
+
+@client.command(aliases=['add'])
+async def create(ctx, *, name):
+    name = ' '.join([p.capitalize() for p in name.split(" ")])
+    name.replace("9a", "9A")
+    name.replace("9b", "9B")
+    name.replace("9c", "9C")
+    name.replace("9d", "9D")
+    hyphenated_name = name.replace(" ", "-") 
+    new_role = await ctx.guild.create_role(name=hyphenated_name)
+
+    # https://stackoverflow.com/questions/64528917/adding-channel-overwrites-for-user-in-discord-py
+    # https://stackoverflow.com/questions/63975108/creating-a-category-in-discordpy-with-permissions-that-only-a-specific-role-can
+    # Hide this category from view by default
+    pleb_overwrite = discord.PermissionOverwrite()
+    pleb_overwrite.read_messages = False
+    pleb_overwrite.send_messages = False
+    # But allow those with the new role to see it
+    patrician_overwrite = discord.PermissionOverwrite()
+    patrician_overwrite.read_messages = True 
+    patrician_overwrite.send_messages = True 
+    overwrites = {
+            ctx.guild.default_role: pleb_overwrite,
+            new_role: patrician_overwrite
+            }
+
+    # Place the new category underneath the last big category. For now this is
+    # hardcoded.
+    pos = 9
+    await ctx.send(f"Placing new category {name} after {ctx.guild.categories[pos]}") 
+    new_category = await ctx.guild.create_category(name=name, overwrites=overwrites, position=pos) 
+
+    # Populate the new category with channels
+    await new_category.create_text_channel("announcements")
+    await new_category.create_text_channel("general")
+    await new_category.create_text_channel("homework")
+    await new_category.create_text_channel("discussion")
+    await new_category.create_voice_channel(name)
+
+    return await ctx.send("Done :3")
 
 
 @client.command(aliases=['remove', 'delete', 'purge', 'nuke'])
@@ -116,7 +152,7 @@ async def erase(ctx, *, arg):
     to_erase = ""
     stop = True
     for category in ctx.guild.categories:
-        if arg == category.name:
+        if arg.lower() == category.name.lower():
             to_erase = category 
             stop = False 
             break
@@ -127,6 +163,6 @@ async def erase(ctx, *, arg):
         await c.delete()
     await to_erase.delete()
     
-    return await ctx.send("Done")
+    return await ctx.send("Done :)")
 
 client.run(TOKEN)
