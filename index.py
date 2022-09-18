@@ -33,11 +33,20 @@ async def help(ctx):
             value=f'Duplicates channel category and its channels and '
                     'roles/permissions',
             inline=False)
+    embed.add_field(name=f'`{PREFIX}create some channel category here`',
+            value=f'Creates a custom category accessible only to the '
+                    'corresponding role of the same name.',
+            inline=False)
     embed.add_field(name=f'`{PREFIX}erase some channel category here`',
             value=f'Erases channel category and its channels',
             inline=False)
     embed.add_field(name=f'`{PREFIX}find some role`',
             value=f'Shows a list of people with the specified role',
+            inline=False)
+    embed.add_field(name=f'`{PREFIX}archive some channel category here`',
+            value=f'Moves category to bottom of server, and appends '
+                    '"[ARCHIVED]" to its name. *In development. Please do '
+                    'not use.*',
             inline=False)
     embed.set_footer(text="Contact radix#9084 with issues.")
     return await ctx.send(embed=embed)
@@ -109,10 +118,10 @@ async def duplicate(ctx, *, arg):
 @client.command(aliases=['add'])
 async def create(ctx, *, name):
     name = ' '.join([p.capitalize() for p in name.split(" ")])
-    name.replace("9a", "9A")
-    name.replace("9b", "9B")
-    name.replace("9c", "9C")
-    name.replace("9d", "9D")
+    name = (name.replace("9a", "9A")
+                .replace("9b", "9B")
+                .replace("9c", "9C")
+                .replace("9d", "9D"))
     hyphenated_name = name.replace(" ", "-") 
     new_role = await ctx.guild.create_role(name=hyphenated_name)
 
@@ -143,6 +152,38 @@ async def create(ctx, *, name):
     await new_category.create_text_channel("homework")
     await new_category.create_text_channel("discussion")
     await new_category.create_voice_channel(name)
+
+    return await ctx.send("Done :3")
+
+
+@client.command(aliases=['hide'])
+# @commands.has_any_role('Server Moderator', 'Server Moderator in Training')
+async def archive(ctx, *arg):
+    if not 'Server Moderator' in ctx.author.roles:
+        return await ctx.send("No >:(")
+
+    if arg == "this":
+        # We choose the category that the command message was sent in
+        category = ctx.channel.category
+    else:
+        # We look for the matching category and choose any match
+        to_archive = ""
+        stop = True
+        for category in ctx.guild.categories:
+            if arg.lower() == category.name.lower():
+                to_archive = category
+                stop = False 
+                break
+        if stop:
+            return await ctx.send(f"No such category found")
+    
+    # We are only allowed to delete categories whose names start with "9" (i.e.,
+    # are in the format 9C Mitchell).
+    if "global" in category.name.lower() or not arg.lower().startswith("9"):
+        return await ctx.send(f"Illegal!!!!!!!")
+    else:
+        await to_archive.edit(name=f"{str(to_archive)} [ARCHIVED]",
+                position=len(ctx.guild.categories))
 
     return await ctx.send("Done :3")
 
