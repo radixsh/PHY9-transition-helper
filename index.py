@@ -66,10 +66,7 @@ async def find(ctx, *, role):
 
     people_in_role = []
     for m in ctx.guild.members:
-        member_specific_roles = []
-        for r in m.roles:
-            member_specific_roles.append(r.name)
-        if role in member_specific_roles:
+        if role in [r.name.lower() for r in m.roles]:
             people_in_role.append(f'`{m.name}#{m.discriminator}`')
 
     if not people_in_role:
