@@ -129,13 +129,9 @@ async def duplicate(ctx, *, arg):
 @client.command(aliases=["add"])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def create(ctx, *, name):
-    name = " ".join([p.capitalize() for p in name.split(" ")])
-    name = (
-        name.replace("9a", "9A")
-        .replace("9b", "9B")
-        .replace("9c", "9C")
-        .replace("9d", "9D")
-    )
+    name = [p.capitalize() for p in name.split(" ")]
+    name[0] = name[0].upper()
+    name = ' '.join(name)
     hyphenated_name = name.replace(" ", "-")
     new_role = await ctx.guild.create_role(name=hyphenated_name)
 
@@ -151,10 +147,15 @@ async def create(ctx, *, name):
     patrician_overwrite.send_messages = True
     overwrites = {ctx.guild.default_role: pleb_overwrite, new_role: patrician_overwrite}
 
-    # Place the new category underneath the last big category. For now this is
-    # hardcoded.
-    pos = 8
-    await ctx.send(f"Creating new category {name} after {ctx.guild.categories[pos]}")
+# Place the new category before the first category with [ARCHIVED] in its
+    # name
+    pos = len(ctx.guild.categories)
+    for category in ctx.guild.categories:
+        if "[archived]" in category.name.lower():
+            pos = ctx.guild.categories.index(category) - 1
+            break
+
+    await ctx.send(f"Creating new category {name}")
     new_category = await ctx.guild.create_category(
         name=name, overwrites=overwrites, position=pos
     )
