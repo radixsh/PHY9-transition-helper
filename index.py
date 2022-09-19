@@ -40,13 +40,13 @@ async def help(ctx):
     embed.add_field(name=f'`{PREFIX}archive some channel category here`',
             value=f'Moves category to bottom of server and appends '
                    '"[ARCHIVED]" to its name. Note: the '
-                   'category must be 9C _____ AND not contain the string '
-                   '"GLOBAL".',
+                   'category must be `9_ _____` AND not contain the string '
+                   '`GLOBAL`.',
             inline=False)
     embed.add_field(name=f'`{PREFIX}erase some channel category`',
             value=f'Erases channel category and its channels. Note: the '
-                   'category must be 9C _____ AND not contain the string '
-                   '"GLOBAL".',
+                   'category must be `9_ _____` AND not contain the string '
+                   '`GLOBAL`.',
             inline=False)
     embed.add_field(name=f'`{PREFIX}find some role`',
             value=f'Shows a list of people with the specified role',
@@ -55,11 +55,12 @@ async def help(ctx):
     return await ctx.send(embed=embed)
 
 
-@client.command(aliases=['f'])
+@client.command(aliases=['list'])
 async def find(ctx, *, role):
+    role = role.lower()
     real_roles = []
     for real_role in ctx.guild.roles:
-        real_roles.append(real_role.name)
+        real_roles.append(real_role.name.lower())
     if role not in real_roles:
         return await ctx.send("That role does not exist!")
 
@@ -161,6 +162,12 @@ async def create(ctx, *, name):
     return await ctx.send("Done :3")
 
 
+def find_match(needle, haystack):
+    for category in haystack:
+        if needle.lower() == category.name.lower():
+            return category
+
+
 @client.command(aliases=['hide', 'shelve'])
 @commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
 async def archive(ctx, *, arg):
@@ -169,14 +176,8 @@ async def archive(ctx, *, arg):
         to_archive = ctx.channel.category
     else:
         # We look for the matching category and choose any match
-        to_archive = ""
-        stop = True
-        for category in ctx.guild.categories:
-            if arg.lower() == category.name.lower():
-                to_archive = category
-                stop = False 
-                break
-        if stop:
+        to_archive = find_match(arg, ctx.guild.categories)
+        if not to_archive:
             return await ctx.send(f"No such category found")
     
     # We are only allowed to delete categories whose names start with "9" (i.e.,
@@ -197,14 +198,8 @@ async def erase(ctx, *, arg):
         # We choose the category that the command message was sent in
         to_erase = ctx.channel.category
     else:
-        to_erase = ""
-        stop = True
-        for category in ctx.guild.categories:
-            if arg.lower() == category.name.lower():
-                to_erase = category 
-                stop = False 
-                break
-        if stop:
+        to_erase = find_match(arg, ctx.guild.categories)
+        if not to_erase:
             return await ctx.send(f"No such category found")
 
     if "global" in to_erase.name.lower() or not to_erase.name.startswith("9"):
@@ -213,5 +208,22 @@ async def erase(ctx, *, arg):
     for c in to_erase.channels:
         await c.delete()
     await to_erase.delete()
+
+
+@client.command(aliases=[])
+@commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
+async def strip(ctx):
+    roles_to_strip = ('9A', '9B', '9C', '9D', '9H') 
+    # https://stackoverflow.com/questions/62234748/how-to-remove-multiple-roles-from-all-members-in-a-guild-discord-py
+    roles = tuple(discord.utils.get(ctx.guild.roles, name=n) for n in roles_to_strip)
+
+    for m in ctx.guild.members:
+        try: 
+            await m.remove_roles(*roles)
+        except:
+            await ctx.send(f"Couldn't remove roles from {m}")
+
+    return await ctx.send(f'Removed roles :)')
+
 
 client.run(TOKEN)
