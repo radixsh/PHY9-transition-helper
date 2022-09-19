@@ -69,33 +69,29 @@ async def help(ctx):
 
 
 @client.command(aliases=["list"])
-async def find(ctx, *, role):
-    role = role.lower()
-    real_roles = []
+async def find(ctx, *, role_name):
+    role_name = role_name.lower()
+    role = None
     for real_role in ctx.guild.roles:
-        real_roles.append(real_role.name.lower())
-    if role not in real_roles:
+        if real_role.name.lower() == role_name:
+            role = real_role
+            break
+    if role is None:
         return await ctx.send("That role does not exist!")
 
-    people_in_role = []
-    for m in ctx.guild.members:
-        if role in [r.name.lower() for r in m.roles]:
-            people_in_role.append(f"`{m.name}#{m.discriminator}`")
-
-    if not people_in_role:
+    if not role.members:
         return await ctx.send(f"No one with that role!")
 
-    long_list = f"People with role `{role}`:\n"
-    for person in people_in_role:
-        long_list += f"{person}\n"
-    parts = []
-    for i in range(0, len(long_list) - 1, 1900):
-        temp = long_list[i : i + 1900].rindex("\n")
-        try:
-            await ctx.send(long_list[i:temp])
-        except:
-            print(f"Failed to ctx.send: {long_list[i:temp]}")
-    return
+    long_list = [f"People with role `{role_name}`:"]
+    for person in role.members:
+        long_list.append(str(person))
+    paginator = commands.Paginator()
+    for line in long_list:
+        if len(line) + len(paginator) > 2000:
+            paginator.close_page()
+        paginator.add_line(line)
+    for page in paginator.pages:
+        await ctx.send(page)
 
 
 @client.command(aliases=["dup", "clone"])
@@ -234,19 +230,5 @@ async def strip(ctx):
         for member in role.members:
             await member.remove_roles(role)
     return await ctx.send(f"Removed roles :)")
-
-    """
-    roles_to_strip = ('9A', '9B', '9C', '9D', '9H')
-    # https://stackoverflow.com/questions/62234748/how-to-remove-multiple-roles-from-all-members-in-a-guild-discord-py
-    roles = tuple(discord.utils.get(ctx.guild.roles, name=n) for n in roles_to_strip)
-
-    for m in ctx.guild.members:
-        try:
-            await m.remove_roles(*roles)
-        except:
-            await ctx.send(f"Couldn't remove roles from {m}")
-    return await ctx.send(f'Removed roles :)')
-    """
-
 
 client.run(TOKEN)
