@@ -228,6 +228,11 @@ async def erase(ctx, *, arg):
         await c.delete()
     await to_erase.delete()
 
+    try:
+        await ctx.send(f"Successfully deleted category {to_erase.name}")
+    except:
+        pass
+
 
 @client.command(aliases=[])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
