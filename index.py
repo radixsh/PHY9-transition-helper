@@ -8,10 +8,12 @@ client = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
 @client.event
 async def on_ready():
-    print(f'Logged in as {client.user}!')
-    await client.change_presence(activity=discord.Activity(
-        type=discord.ActivityType.listening,
-        name=f'{PREFIX}help'))
+    print(f"Logged in as {client.user}!")
+    await client.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening, name=f"{PREFIX}help"
+        )
+    )
     print("\nServers: ")
     for guild in client.guilds:
         print(f"- {guild.name} ({guild.member_count} members)")
@@ -24,38 +26,49 @@ async def on_message(message):
     await client.process_commands(message)
 
 
-@client.command(aliases=['h'])
+@client.command(aliases=["h"])
 async def help(ctx):
-    embed = discord.Embed(title=f"Bot prefix: `{PREFIX}`",
-            description=f"Role/channel/category duplicator bot",
-            color=0xb2558d)
-    embed.add_field(name=f'`{PREFIX}create some channel category`',
-            value=f'Creates a custom category accessible only to the '
-                   'corresponding role of the same name.',
-            inline=False)
-    embed.add_field(name=f'`{PREFIX}duplicate some channel category`',
-            value=f'Duplicates channel category and its channels and '
-                    'roles/permissions',
-            inline=False)
-    embed.add_field(name=f'`{PREFIX}archive some channel category here`',
-            value=f'Moves category to bottom of server and appends '
-                   '"[ARCHIVED]" to its name. Note: the '
-                   'category must be `9_ _____` AND not contain the string '
-                   '`GLOBAL`.',
-            inline=False)
-    embed.add_field(name=f'`{PREFIX}erase some channel category`',
-            value=f'Erases channel category and its channels. Note: the '
-                   'category must be `9_ _____` AND not contain the string '
-                   '`GLOBAL`.',
-            inline=False)
-    embed.add_field(name=f'`{PREFIX}find some role`',
-            value=f'Shows a list of people with the specified role',
-            inline=False)
+    embed = discord.Embed(
+        title=f"Bot prefix: `{PREFIX}`",
+        description=f"Role/channel/category duplicator bot",
+        color=0xB2558D,
+    )
+    embed.add_field(
+        name=f"`{PREFIX}create some channel category`",
+        value=f"Creates a custom category accessible only to the "
+        "corresponding role of the same name.",
+        inline=False,
+    )
+    embed.add_field(
+        name=f"`{PREFIX}duplicate some channel category`",
+        value=f"Duplicates channel category and its channels and " "roles/permissions",
+        inline=False,
+    )
+    embed.add_field(
+        name=f"`{PREFIX}archive some channel category here`",
+        value=f"Moves category to bottom of server and appends "
+        '"[ARCHIVED]" to its name. Note: the '
+        "category must be `9_ _____` AND not contain the string "
+        "`GLOBAL`.",
+        inline=False,
+    )
+    embed.add_field(
+        name=f"`{PREFIX}erase some channel category`",
+        value=f"Erases channel category and its channels. Note: the "
+        "category must be `9_ _____` AND not contain the string "
+        "`GLOBAL`.",
+        inline=False,
+    )
+    embed.add_field(
+        name=f"`{PREFIX}find some role`",
+        value=f"Shows a list of people with the specified role",
+        inline=False,
+    )
     embed.set_footer(text="Contact radix#9084 with issues.")
     return await ctx.send(embed=embed)
 
 
-@client.command(aliases=['list'])
+@client.command(aliases=["list"])
 async def find(ctx, *, role):
     role = role.lower()
     real_roles = []
@@ -67,26 +80,26 @@ async def find(ctx, *, role):
     people_in_role = []
     for m in ctx.guild.members:
         if role in [r.name.lower() for r in m.roles]:
-            people_in_role.append(f'`{m.name}#{m.discriminator}`')
+            people_in_role.append(f"`{m.name}#{m.discriminator}`")
 
     if not people_in_role:
-        return await ctx.send(f'No one with that role!')
+        return await ctx.send(f"No one with that role!")
 
-    long_list = f'People with role `{role}`:\n'
+    long_list = f"People with role `{role}`:\n"
     for person in people_in_role:
-        long_list += f'{person}\n'
+        long_list += f"{person}\n"
     parts = []
-    for i in range(0, len(long_list)-1, 1900):
-        temp = long_list[i:i+1900].rindex("\n")
+    for i in range(0, len(long_list) - 1, 1900):
+        temp = long_list[i : i + 1900].rindex("\n")
         try:
             await ctx.send(long_list[i:temp])
         except:
-            print(f'Failed to ctx.send: {long_list[i:temp]}')
+            print(f"Failed to ctx.send: {long_list[i:temp]}")
     return
 
 
-@client.command(aliases=['dup', 'clone'])
-@commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
+@client.command(aliases=["dup", "clone"])
+@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def duplicate(ctx, *, arg):
     old = ""
     stop = True
@@ -99,9 +112,9 @@ async def duplicate(ctx, *, arg):
         return await ctx.send(f"No such category found")
 
     # Copy the old category's roles/perms to the new category
-    new = await ctx.guild.create_category(f"{old.name}",
-            overwrites=old.overwrites,
-            position=old.position)
+    new = await ctx.guild.create_category(
+        f"{old.name}", overwrites=old.overwrites, position=old.position
+    )
 
     for c in old.channels:
         if not c.permissions_synced:
@@ -117,14 +130,16 @@ async def duplicate(ctx, *, arg):
     return await ctx.send("Done :3")
 
 
-@client.command(aliases=['add'])
-@commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
+@client.command(aliases=["add"])
+@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def create(ctx, *, name):
-    name = ' '.join([p.capitalize() for p in name.split(" ")])
-    name = (name.replace("9a", "9A")
-                .replace("9b", "9B")
-                .replace("9c", "9C")
-                .replace("9d", "9D"))
+    name = " ".join([p.capitalize() for p in name.split(" ")])
+    name = (
+        name.replace("9a", "9A")
+        .replace("9b", "9B")
+        .replace("9c", "9C")
+        .replace("9d", "9D")
+    )
     hyphenated_name = name.replace(" ", "-")
     new_role = await ctx.guild.create_role(name=hyphenated_name)
 
@@ -138,16 +153,15 @@ async def create(ctx, *, name):
     patrician_overwrite = discord.PermissionOverwrite()
     patrician_overwrite.read_messages = True
     patrician_overwrite.send_messages = True
-    overwrites = {
-            ctx.guild.default_role: pleb_overwrite,
-            new_role: patrician_overwrite
-            }
+    overwrites = {ctx.guild.default_role: pleb_overwrite, new_role: patrician_overwrite}
 
     # Place the new category underneath the last big category. For now this is
     # hardcoded.
     pos = 8
     await ctx.send(f"Creating new category {name} after {ctx.guild.categories[pos]}")
-    new_category = await ctx.guild.create_category(name=name, overwrites=overwrites, position=pos)
+    new_category = await ctx.guild.create_category(
+        name=name, overwrites=overwrites, position=pos
+    )
 
     # Populate the new category with channels
     await new_category.create_text_channel("announcements")
@@ -165,8 +179,8 @@ def find_match(needle, haystack):
             return category
 
 
-@client.command(aliases=['hide', 'shelve'])
-@commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
+@client.command(aliases=["hide", "shelve"])
+@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def archive(ctx, *, arg):
     if arg == "this":
         # We choose the category that the command message was sent in
@@ -182,14 +196,15 @@ async def archive(ctx, *, arg):
     if "global" in to_archive.name.lower() or not to_archive.name.startswith("9"):
         return await ctx.send(f"Illegal!!!!!!!")
 
-    await to_archive.edit(name=f"{str(to_archive)} [ARCHIVED]",
-            position=len(ctx.guild.categories))
+    await to_archive.edit(
+        name=f"{str(to_archive)} [ARCHIVED]", position=len(ctx.guild.categories)
+    )
 
     return await ctx.send("Done :3")
 
 
-@client.command(aliases=['remove', 'delete', 'purge', 'nuke'])
-@commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
+@client.command(aliases=["remove", "delete", "purge", "nuke"])
+@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def erase(ctx, *, arg):
     if arg == "this":
         # We choose the category that the command message was sent in
@@ -208,19 +223,19 @@ async def erase(ctx, *, arg):
 
 
 @client.command(aliases=[])
-@commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
+@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def strip(ctx):
-    roles_to_strip = ['9A', '9B', '9C', '9D', '9H']
+    roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
     for role in roles_to_strip:
         role = find_match(to_strip, ctx.guild.roles)
 
     # Now the list is full of actual roles!
-    for role in roles_to_strip: 
+    for role in roles_to_strip:
         for member in role.members:
             await member.remove_roles(role)
-    return await ctx.send(f'Removed roles :)')
+    return await ctx.send(f"Removed roles :)")
 
-    '''
+    """
     roles_to_strip = ('9A', '9B', '9C', '9D', '9H')
     # https://stackoverflow.com/questions/62234748/how-to-remove-multiple-roles-from-all-members-in-a-guild-discord-py
     roles = tuple(discord.utils.get(ctx.guild.roles, name=n) for n in roles_to_strip)
@@ -231,7 +246,7 @@ async def strip(ctx):
         except:
             await ctx.send(f"Couldn't remove roles from {m}")
     return await ctx.send(f'Removed roles :)')
-    '''
+    """
 
 
 client.run(TOKEN)
