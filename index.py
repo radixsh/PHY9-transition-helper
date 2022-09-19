@@ -238,14 +238,17 @@ async def erase(ctx, *, arg):
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def strip(ctx):
     roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
+    roles = []
     for role in roles_to_strip:
-        role = find_match(to_strip, ctx.guild.roles)
+        roles.append(find_match(role, ctx.guild.roles))
 
     # Now the list is full of actual roles!
-    for role in roles_to_strip:
+    count = 0
+    for role in roles:
         for member in role.members:
             await member.remove_roles(role)
-    return await ctx.send(f"Removed roles :)")
+            count += 1
+    return await ctx.send(f"Removed roles {', '.join(roles_to_strip)} from {count} members :)")
 
 
 client.run(TOKEN)
