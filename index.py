@@ -212,7 +212,6 @@ async def erase(ctx, *, arg):
 async def strip(ctx):
     roles_to_strip = ['9A', '9B', '9C', '9D', '9H']
     for role in roles_to_strip:
-        role = '9A'
         role = find_match(to_strip, ctx.guild.roles)
 
     # Now the list is full of actual roles!
