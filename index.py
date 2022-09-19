@@ -41,7 +41,7 @@ async def help(ctx):
     )
     embed.add_field(
         name=f"`{PREFIX}duplicate some channel category`",
-        value=f"Duplicates channel category and its channels and " "roles/permissions",
+        value=f"Duplicates channel category and its channels and roles/permissions",
         inline=False,
     )
     embed.add_field(
@@ -131,7 +131,7 @@ async def duplicate(ctx, *, arg):
 async def create(ctx, *, name):
     name = [p.capitalize() for p in name.split(" ")]
     name[0] = name[0].upper()
-    name = ' '.join(name)
+    name = " ".join(name)
     hyphenated_name = name.replace(" ", "-")
     new_role = await ctx.guild.create_role(name=hyphenated_name)
 
@@ -147,7 +147,7 @@ async def create(ctx, *, name):
     patrician_overwrite.send_messages = True
     overwrites = {ctx.guild.default_role: pleb_overwrite, new_role: patrician_overwrite}
 
-# Place the new category before the first category with [ARCHIVED] in its
+    # Place the new category before the first category with [ARCHIVED] in its
     # name
     pos = len(ctx.guild.categories)
     for category in ctx.guild.categories:
@@ -176,6 +176,12 @@ def find_match(needle, haystack):
             return category
 
 
+def is_protected(category):
+    return "global" in category.name.lower() and (
+        not category.name.startswith("9") or not category.name.lower().startswith("phy")
+    )
+
+
 @client.command(aliases=["hide", "shelve"])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def archive(ctx, *, arg):
@@ -190,12 +196,17 @@ async def archive(ctx, *, arg):
 
     # We are only allowed to delete categories whose names start with "9" (i.e.,
     # are in the format 9C Mitchell).
-    if "global" in to_archive.name.lower() or not to_archive.name.startswith("9"):
-        return await ctx.send(f"Illegal!!!!!!!")
+    if is_protected(to_archive):
+        return await ctx.send(f"Illegal!")
 
-    await to_archive.edit(
-        name=f"{str(to_archive)} [ARCHIVED]", position=len(ctx.guild.categories)
-    )
+    # Place the new category before the first category with [ARCHIVED] in its
+    # name
+    pos = len(ctx.guild.categories)
+    for category in ctx.guild.categories:
+        if "[archived]" in category.name.lower():
+            pos = ctx.guild.categories.index(category) - 1
+            break
+    await to_archive.edit(name=f"{str(to_archive)} [ARCHIVED]", position=pos)
 
     return await ctx.send("Done :3")
 
@@ -204,15 +215,14 @@ async def archive(ctx, *, arg):
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def erase(ctx, *, arg):
     if arg == "this":
-        # We choose the category that the command message was sent in
         to_erase = ctx.channel.category
     else:
         to_erase = find_match(arg, ctx.guild.categories)
         if not to_erase:
             return await ctx.send(f"No such category found")
 
-    if "global" in to_erase.name.lower() or not to_erase.name.startswith("9"):
-        return await ctx.send(f"Illegal!!!!!!!")
+    if is_protected(to_erase):
+        return await ctx.send(f"Illegal!")
 
     for c in to_erase.channels:
         await c.delete()
@@ -231,5 +241,6 @@ async def strip(ctx):
         for member in role.members:
             await member.remove_roles(role)
     return await ctx.send(f"Removed roles :)")
+
 
 client.run(TOKEN)
