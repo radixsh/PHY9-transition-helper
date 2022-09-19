@@ -93,7 +93,7 @@ async def duplicate(ctx, *, arg):
     for category in ctx.guild.categories:
         if arg.lower() == category.name.lower():
             old = category
-            stop = False 
+            stop = False
             break
     if stop:
         return await ctx.send(f"No such category found")
@@ -109,9 +109,9 @@ async def duplicate(ctx, *, arg):
         else:
             overwrites = old.overwrites
 
-        clone = await c.clone() 
+        clone = await c.clone()
         await clone.edit(category=new)
-    
+
     await old.edit(name=f"{old.name} [Archived by Duplicator]", position=1000)
 
     return await ctx.send("Done :3")
@@ -125,7 +125,7 @@ async def create(ctx, *, name):
                 .replace("9b", "9B")
                 .replace("9c", "9C")
                 .replace("9d", "9D"))
-    hyphenated_name = name.replace(" ", "-") 
+    hyphenated_name = name.replace(" ", "-")
     new_role = await ctx.guild.create_role(name=hyphenated_name)
 
     # https://stackoverflow.com/questions/64528917/adding-channel-overwrites-for-user-in-discord-py
@@ -136,8 +136,8 @@ async def create(ctx, *, name):
     pleb_overwrite.send_messages = False
     # But allow those with the new role to see it
     patrician_overwrite = discord.PermissionOverwrite()
-    patrician_overwrite.read_messages = True 
-    patrician_overwrite.send_messages = True 
+    patrician_overwrite.read_messages = True
+    patrician_overwrite.send_messages = True
     overwrites = {
             ctx.guild.default_role: pleb_overwrite,
             new_role: patrician_overwrite
@@ -146,8 +146,8 @@ async def create(ctx, *, name):
     # Place the new category underneath the last big category. For now this is
     # hardcoded.
     pos = 8
-    await ctx.send(f"Creating new category {name} after {ctx.guild.categories[pos]}") 
-    new_category = await ctx.guild.create_category(name=name, overwrites=overwrites, position=pos) 
+    await ctx.send(f"Creating new category {name} after {ctx.guild.categories[pos]}")
+    new_category = await ctx.guild.create_category(name=name, overwrites=overwrites, position=pos)
 
     # Populate the new category with channels
     await new_category.create_text_channel("announcements")
@@ -176,12 +176,12 @@ async def archive(ctx, *, arg):
         to_archive = find_match(arg, ctx.guild.categories)
         if not to_archive:
             return await ctx.send(f"No such category found")
-    
+
     # We are only allowed to delete categories whose names start with "9" (i.e.,
     # are in the format 9C Mitchell).
     if "global" in to_archive.name.lower() or not to_archive.name.startswith("9"):
         return await ctx.send(f"Illegal!!!!!!!")
-    
+
     await to_archive.edit(name=f"{str(to_archive)} [ARCHIVED]",
             position=len(ctx.guild.categories))
 
@@ -201,7 +201,7 @@ async def erase(ctx, *, arg):
 
     if "global" in to_erase.name.lower() or not to_erase.name.startswith("9"):
         return await ctx.send(f"Illegal!!!!!!!")
-    
+
     for c in to_erase.channels:
         await c.delete()
     await to_erase.delete()
@@ -210,17 +210,29 @@ async def erase(ctx, *, arg):
 @client.command(aliases=[])
 @commands.has_any_role('Server Moderator', 'Server Moderator In-Training')
 async def strip(ctx):
-    roles_to_strip = ('9A', '9B', '9C', '9D', '9H') 
+    roles_to_strip = ['9A', '9B', '9C', '9D', '9H']
+    for role in roles_to_strip:
+        role = '9A'
+        role = find_match(to_strip, ctx.guild.roles)
+
+    # Now the list is full of actual roles!
+    for role in roles_to_strip: 
+        for member in role.members:
+            await member.remove_roles(role)
+    return await ctx.send(f'Removed roles :)')
+
+    '''
+    roles_to_strip = ('9A', '9B', '9C', '9D', '9H')
     # https://stackoverflow.com/questions/62234748/how-to-remove-multiple-roles-from-all-members-in-a-guild-discord-py
     roles = tuple(discord.utils.get(ctx.guild.roles, name=n) for n in roles_to_strip)
 
     for m in ctx.guild.members:
-        try: 
+        try:
             await m.remove_roles(*roles)
         except:
             await ctx.send(f"Couldn't remove roles from {m}")
-
     return await ctx.send(f'Removed roles :)')
+    '''
 
 
 client.run(TOKEN)
