@@ -30,13 +30,14 @@ async def on_message(message):
 async def help(ctx):
     embed = discord.Embed(
         title=f"Bot prefix: `{PREFIX}`",
-        description=f"Role/channel/category duplicator bot",
+        description=f"Role/channel/category duplicator bot. Note that command "
+                    "execution requires **Server Moderator** or **Server Moderator "
+                    "In-Training** role.",
         color=0xB2558D,
     )
     embed.add_field(
         name=f"`{PREFIX}create some channel category`",
-        value=f"Creates a custom category accessible only to the "
-        "corresponding role of the same name.",
+        value=f"Creates a custom category and role.",
         inline=False,
     )
     embed.add_field(
@@ -244,10 +245,17 @@ async def strip(ctx):
 
     # Now the list is full of actual roles!
     count = 0
-    for role in roles:
-        for member in role.members:
-            await member.remove_roles(role)
-            count += 1
+    
+    # https://www.reddit.com/r/discordapp/comments/8yvq4g/get_all_users_with_a_role_using_discordpy/
+    for member in ctx.guild.members:
+        for role in member.roles:
+            if role.name in roles:
+                await member.remove_roles(role)
+                count += 1
+    # for role in roles:
+    #     for member in role.members:
+    #         await member.remove_roles(role)
+    #         count += 1
     return await ctx.send(f"Removed roles {', '.join(roles_to_strip)} from {count} members :)")
 
 
