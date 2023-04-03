@@ -138,11 +138,12 @@ async def duplicate(ctx, *, arg):
 async def create(ctx, *, name=None):
     if not name:
         return await ctx.send("Error: what category are you trying to create?")
-    name = [p.capitalize() for p in name.split(" ")]
-    name = " ".join(name)
-    hyphenated_name = name.replace(" ", "-")
-    new_role = await ctx.guild.create_role(name=hyphenated_name)
 
+    # Transform "9c mitchell" to "9C Mitchell" for channel name
+    name = [letter.capitalize() for letter in name.split(" ")]
+    name[0] = name[0].upper() 
+    name = " ".join(name)
+    
     # https://stackoverflow.com/questions/64528917/adding-channel-overwrites-for-user-in-discord-py
     # https://stackoverflow.com/questions/63975108/creating-a-category-in-discordpy-with-permissions-that-only-a-specific-role-can
     # Hide this category from view by default
@@ -155,14 +156,15 @@ async def create(ctx, *, name=None):
     patrician_overwrite.send_messages = True
     overwrites = {ctx.guild.default_role: pleb_overwrite, new_role: patrician_overwrite}
 
-    # Place the new category before the first category with [ARCHIVED] in its
-    # name
+    # Place the new category before the first category that has [ARCHIVED] in
+    # its name
     pos = len(ctx.guild.categories)
     for category in ctx.guild.categories:
         if "[archived]" in category.name.lower():
             pos = ctx.guild.categories.index(category) - 1
             break
 
+    # Create the category
     await ctx.send(f"Creating new category {name}")
     new_category = await ctx.guild.create_category(
         name=name, overwrites=overwrites, position=pos
@@ -174,6 +176,10 @@ async def create(ctx, *, name=None):
     await new_category.create_text_channel("homework")
     await new_category.create_text_channel("discussion")
     await new_category.create_voice_channel(name)
+
+    # Create corresponding role
+    hyphenated_name = name.replace(" ", "-")
+    new_role = await ctx.guild.create_role(name=hyphenated_name)
 
     return await ctx.send("Done :3")
 
