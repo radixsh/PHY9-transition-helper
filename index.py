@@ -48,16 +48,16 @@ async def help(ctx):
     embed.add_field(
         name=f"`{PREFIX}archive some channel category here`",
         value=f"Moves category to bottom of server and appends "
-        '"[ARCHIVED]" to its name. Note: the '
-        "category must be `9_ _____` AND not contain the string "
-        "`GLOBAL`.",
+        '`[ARCHIVED]` to its name, enabling it to be deleted later. Note: the '
+        'category must start with `9_` or `PHY`, and it must not contain the '
+        "string `GLOBAL`.",
         inline=False,
     )
     embed.add_field(
         name=f"`{PREFIX}erase some channel category`",
-        value=f"Erases channel category and its channels. Note: the "
-        "category must be `9_ _____` AND not contain the string "
-        "`GLOBAL`.",
+        value=f"Erases channel category, and attempts to delete the "
+        "category's associated role. Note: the category must end with "
+        "`[ARCHIVED]`.",
         inline=False,
     )
     embed.add_field(
@@ -71,19 +71,25 @@ async def help(ctx):
 
 @client.command(aliases=["list"])
 async def find(ctx, *, role_name):
+    if not role_name:
+        return await ctx.send(f"Error: what role are you trying to "
+                "investigate?")
+
     role_name = role_name.lower()
-    role = None
-    for real_role in ctx.guild.roles:
-        if real_role.name.lower() == role_name:
-            role = real_role
-            break
+   
+    # role = None
+    # for real_role in ctx.guild.roles:
+    #     if real_role.name.lower() == role_name:
+    #         role = real_role
+    #         break
+    role = find_match(role_name, ctx.guild.roles)
     if role is None:
         return await ctx.send("That role does not exist!")
 
     if not role.members:
         return await ctx.send(f"No one with that role!")
 
-    long_list = [f"People with role `{role_name}`:"]
+    long_list = [f'People with role `{role_name}`:']
     for person in role.members:
         long_list.append(str(person))
     paginator = commands.Paginator()
@@ -122,16 +128,17 @@ async def duplicate(ctx, *, arg):
         clone = await c.clone()
         await clone.edit(category=new)
 
-    await old.edit(name=f"{old.name} [Archived by Duplicator]", position=1000)
+    await old.edit(name=f"{old.name} [ARCHIVE]", position=1000)
 
     return await ctx.send("Done :3")
 
 
 @client.command(aliases=["add"])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
-async def create(ctx, *, name):
+async def create(ctx, *, name=None):
+    if not name:
+        return await ctx.send("Error: what category are you trying to create?")
     name = [p.capitalize() for p in name.split(" ")]
-    name[0] = name[0].upper()
     name = " ".join(name)
     hyphenated_name = name.replace(" ", "-")
     new_role = await ctx.guild.create_role(name=hyphenated_name)
@@ -169,6 +176,7 @@ async def create(ctx, *, name):
     await new_category.create_voice_channel(name)
 
     return await ctx.send("Done :3")
+
 
 
 def find_match(needle, haystack):
