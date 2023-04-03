@@ -195,6 +195,9 @@ def is_protected(category):
 @client.command(aliases=["hide", "shelve"])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def archive(ctx, *, arg):
+    if not arg:
+        return await ctx.send("Error: what category are you trying to archive?")
+
     if arg == "this":
         # We choose the category that the command message was sent in
         to_archive = ctx.channel.category
@@ -224,6 +227,9 @@ async def archive(ctx, *, arg):
 @client.command(aliases=["remove", "delete", "purge", "nuke"])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def erase(ctx, *, arg):
+    if not arg:
+        return await ctx.send("Error: what category are you trying to erase?")
+
     if arg == "this":
         to_erase = ctx.channel.category
     else:
@@ -231,17 +237,24 @@ async def erase(ctx, *, arg):
         if not to_erase:
             return await ctx.send(f"No such category found")
 
-    if is_protected(to_erase):
+    if is_protected(to_erase) or "archive" not in to_erase.name.lower():
         return await ctx.send(f"Illegal!")
 
     for c in to_erase.channels:
         await c.delete()
     await to_erase.delete()
 
-    try:
+    # Quietly fail if the channel in which the command was sent has been deleted
+    if arg != "this":
         await ctx.send(f"Successfully deleted category {to_erase.name}")
+
+    # Attempt to delete the associated role, and quietly fail if impossible
+    try:
+        role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
+        await _delete_role(role_to_erase, ctx)
     except:
-        pass
+        await ctx.send(f'Something went wrong trying to delete the role '
+                        'associated with this category')
 
 
 @client.command(aliases=[])
