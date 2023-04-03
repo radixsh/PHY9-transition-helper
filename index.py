@@ -256,6 +256,18 @@ async def erase(ctx, *, arg):
         await ctx.send(f'Something went wrong trying to delete the role '
                         'associated with this category')
 
+async def _delete_role(role_name, ctx):
+    # Just in case the user sent "9B Mitchell" like the category name
+    role_name = role_name.replace(" ", "-")
+
+    # find_match() is not case-sensitive
+    role = find_match(role_name, ctx.guild.roles)
+    try:
+        await role.delete()
+        await ctx.send(f'Deleted role "{role_name}"')
+    except: 
+        await ctx.send(f'Role not found :(')
+
 
 @client.command(aliases=[])
 @commands.has_any_role("Server Moderator", "Server Moderator In-Training")
