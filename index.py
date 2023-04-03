@@ -186,9 +186,10 @@ def find_match(needle, haystack):
 
 
 def is_protected(category):
-    return "global" in category.name.lower() and (
-        not category.name.startswith("9") or not category.name.lower().startswith("phy")
-    )
+    return "global" in category.name.lower() or (
+            not category.name.startswith("9") 
+            and not category.name.lower().startswith("phy")
+            )
 
 
 @client.command(aliases=["hide", "shelve"])
