@@ -5,25 +5,25 @@ old channels that used to correspond with a particular professor's class.
 
 
 ## Functionalities
+* `erase some existing channel category`: Erases channel category.
+Deletes the role associated with the category.
+* `archive some existing channel category`: Moves category to bottom of list and
+appends [ARCHIVED] to its name, enabling it to be deleted later.
+Deletes the role associated with the category.
 * `create some new channel category`: Creates a custom category and a matching
-custom role, and limits the category to be visible only to that role. 
-* `duplicate some existing channel category`: Duplicates a channel category (both its
-channels and its permissions)
-* `archive some existing channel category`: Moves category to bottom of server
-and appends "[ARCHIVED]" to its name. This command is limited to categories
-whose names are `9_ ______` and which do not contain the string `GLOBAL`.
-* `erase some existing channel category`: Erases category and its channels. This
-command is also limited to section-specific categories.
+custom role, and limits the category to be visible only to that role.
 * `find some role`: Shows a list of people with the specified role.
+* `duplicate some existing channel category`: Duplicates channel category
+and its channels and roles/permissions. To be used only when a certain
+professor is teaching the same class this quarter as last quarter.
 
 
 ## Technologies used
 - [discord.py](https://discordpy.readthedocs.io/en/latest/index.html)
 - [discord.ext.commands](https://discordpy.readthedocs.io/en/latest/ext/commands/index.html)
 - [Discord API](https://discord.com/developers/docs/intro)
-- [node.js](https://nodejs.org/en/)
-- [nodemon](https://nodemon.io/)
-    - [`nodemon --exec python3 hello.py`](https://stackoverflow.com/questions/65021005/how-to-run-python-3-with-nodemon)
+- [node.js](https://nodejs.org/en)
+- [nodemon](https://nodemon.io)
 
 
 ## Usage
