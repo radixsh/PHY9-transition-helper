@@ -39,14 +39,14 @@ async def help(ctx):
         name=f"`{PREFIX}erase some channel category`",
         value=f"_To be used quarterly._"
                "\nErases channel category. Deletes the role associated with the "
-               "category. "
+               "category."
                "\n_Note: the category must end with `[ARCHIVED]`._",
         inline=False,
     )
     embed.add_field(
         name=f"`{PREFIX}archive some channel category`",
         value=f"_To be used quarterly._"
-               "Moves category to bottom of list and appends "
+               "\nMoves category to bottom of list and appends "
                "`[ARCHIVED]` to its name, enabling it to be deleted later. "
                "Deletes the role associated with the category. "
                "\n_Note: the category must start with `9` or `PHY`, and it "
