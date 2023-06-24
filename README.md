@@ -5,17 +5,25 @@ old channels that used to correspond with a particular professor's class.
 
 
 ## Functionalities
+### Commands for server transition between quarters
+These commands should ideally be run in this order:
 * `erase some existing channel category`: Erases channel category.
-Deletes the role associated with the category.
+  Deletes the role associated with the category.
+  * Note: the category must end with `[ARCHIVED]`.
 * `archive some existing channel category`: Moves category to bottom of list and
-appends [ARCHIVED] to its name, enabling it to be deleted later.
-Deletes the role associated with the category.
+  appends [ARCHIVED] to its name, enabling it to be deleted later.
+  Deletes the role associated with the category.
+  * Note: the category must start with `9` or `PHY`, and it must not
+    contain the string `GLOBAL`.
 * `create some new channel category`: Creates a custom category and a matching
-custom role, and limits the category to be visible only to that role.
+  custom role, and limits the category to be visible only to that role.
+* `strip`: Strips roles `9A`, `9B`, `9C`, `9D`, and `9H` from everyone.
+
+### Other commands that may be useful
 * `find some role`: Shows a list of people with the specified role.
 * `duplicate some existing channel category`: Duplicates channel category
-and its channels and roles/permissions. To be used only when a certain
-professor is teaching the same class this quarter as last quarter.
+  and its channels and roles/permissions. To be used only when a certain
+  professor is teaching the same class this quarter as last quarter.
 
 
 ## Technologies used
