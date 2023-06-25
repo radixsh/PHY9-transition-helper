@@ -18,6 +18,10 @@ class TransitionCommands(commands.Cog):
         """
         return ctx.guild is not None and ctx.permissions.administrator
 
+    def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """See cog_check method"""
+        return interaction.guild is not None and interaction.permissions.administrator
+
     @app_commands.command(description="Get help for commands")
     async def help(
         self,
@@ -25,7 +29,7 @@ class TransitionCommands(commands.Cog):
     ):
         PREFIX = "/"
         embed = discord.Embed(
-            title=f"Bot prefix: `{PREFIX}`",
+            title=f"PHY9 Transition Helper",
             description=f"Role/channel/category duplicator bot. Note that command "
             "execution requires **Server Moderator** or **Server Moderator "
             "In-Training** role.",
@@ -249,19 +253,20 @@ class TransitionCommands(commands.Cog):
             return await interaction.response.send_message("Internal Error :(")
         await interaction.response.defer()
         roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
-        roles = []
+        roles: list[discord.Role] = []
         for role in roles_to_strip:
-            roles.append(self.match_case_insensitive_name(role, interaction.guild.roles))
-
+            r = self.match_case_insensitive_name(role, interaction.guild.roles)
+            if r is not None:
+                roles.append(r)
+        
         # Now the list is full of actual roles!
         count = 0
 
         # https://www.reddit.com/r/discordapp/comments/8yvq4g/get_all_users_with_a_role_using_discordpy/
-        for member in interaction.guild.members:
-            for role in member.roles:
-                if role.name in roles:
-                    await member.remove_roles(role)
-                    count += 1
+        for role in roles:
+            for member in role.members:
+                await member.remove_roles(role)
+                count += 1
         await interaction.followup.edit_message(
             (await interaction.original_response()).id,
             content=f"Removed roles {', '.join(roles_to_strip)} from {count} members :)",

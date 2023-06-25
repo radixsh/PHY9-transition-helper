@@ -7,7 +7,7 @@ from env import TOKEN, PREFIX, DEBUG_ID
 DEBUG_SERVER = discord.Object(id=DEBUG_ID)
 
 intents = discord.Intents.all()
-intents.presences = intents.members = False
+intents.presences = False
 client = commands.Bot(
     command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None
 )
