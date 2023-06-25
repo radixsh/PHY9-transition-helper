@@ -7,7 +7,7 @@ from env import TOKEN, PREFIX, DEBUG_ID
 DEBUG_SERVER = discord.Object(id=DEBUG_ID)
 
 intents = discord.Intents.all()
-intents.presences = False
+intents.presences = intents.message_content = False
 client = commands.Bot(
     command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None
 )
@@ -51,8 +51,18 @@ async def dev_sync(ctx: commands.Context):
     await ctx.send("Synced global command tree to development server")
 
 
+@client.command(name="global-sync", hidden=True)
+@commands.is_owner()
+async def global_sync(ctx: commands.Context):
+    """Sync current command tree to dev discord server"""
+    await ctx.send("Initiating global sync...")
+    await client.tree.sync()
+    await ctx.reply(f"Synced global command tree to development server", mention_author=True)
+
+
 @reload.error
 @dev_sync.error
+@global_sync.error
 async def re_err(ctx: commands.Context, err):
     """Likely a permissions error. Should log this, once that's setup."""
     # FIXME: should probably log this
