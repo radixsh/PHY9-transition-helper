@@ -2,23 +2,15 @@ import asyncio
 
 import discord
 from discord.ext import commands
-from env import TOKEN, PREFIX
+from env import TOKEN, PREFIX, DEBUG_ID
 
+DEBUG_SERVER = discord.Object(id=DEBUG_ID)
 
 intents = discord.Intents.all()
 intents.presences = intents.members = False
-client = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
-
-
-@client.check
-async def require_admin(ctx: commands.Context):
-    """Require all commands to be issued by a server administrator
-
-    In the future, we might want to deal a little more granularly with permissions but
-    for now, this seems fine to me. All relevant roles are administrator only, so it
-    should be fine to use this for now.
-    """
-    return ctx.guild is not None and ctx.permissions.administrator
+client = commands.Bot(
+    command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None
+)
 
 
 @client.event
@@ -50,7 +42,17 @@ async def reload(ctx: commands.Context):
     await ctx.send("Complete")
 
 
+@client.command(name="dev-sync", aliases=["dsync"], hidden=True)
+@commands.is_owner()
+async def dev_sync(ctx: commands.Context):
+    """Sync current command tree to dev discord server"""
+    client.tree.copy_global_to(guild=DEBUG_SERVER)
+    await client.tree.sync(guild=DEBUG_SERVER)
+    await ctx.send("Synced global command tree to development server")
+
+
 @reload.error
+@dev_sync.error
 async def re_err(ctx: commands.Context, err):
     """Likely a permissions error. Should log this, once that's setup."""
     # FIXME: should probably log this
