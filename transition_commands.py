@@ -1,13 +1,21 @@
+import difflib
+import re
 from typing import Optional
 
 import discord
-import discord.ext.commands as commands
+from discord import Interaction
 import discord.app_commands as app_commands
+from discord.app_commands import Choice
+import discord.ext.commands as commands
+
+MATCH_HEURISTIC = 1.0
 
 
 class TransitionCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot: commands.Bot = bot
+        self._unarchived_pattern = re.compile(r"9[A-D]H?\s+[-\w]+", re.IGNORECASE)
+        self._archived_pattern = re.compile(r"9[A-D]H?\s+\w+\s+\[ARCHIVED?\]", re.IGNORECASE)
 
     def cog_check(self, ctx: commands.Context):
         """Require all transition commands to be issued by an admin
@@ -18,14 +26,39 @@ class TransitionCommands(commands.Cog):
         """
         return ctx.guild is not None and ctx.permissions.administrator
 
-    def interaction_check(self, interaction: discord.Interaction) -> bool:
+    def interaction_check(self, interaction: Interaction) -> bool:
         """See cog_check method"""
         return interaction.guild is not None and interaction.permissions.administrator
+
+    @staticmethod
+    async def base_autocomplete(
+        interaction: Interaction, curr: str, pattern: re.Pattern
+    ) -> list[Choice[str]]:
+        if interaction.guild is None:
+            return []
+        # Select valid categories based on given pattern
+        categories = [
+            cat
+            for cat in interaction.guild.categories
+            if pattern.fullmatch(cat.name) and "global" not in cat.name.lower()
+        ]
+        if len(curr) == 0:
+            return [app_commands.Choice(name=cat.name, value=cat.name) for cat in categories]
+        # Find similarity of each category name
+        similarities: dict[app_commands.Choice, float] = {}
+        curr = curr.lower()
+        for cat in categories:
+            sim = difflib.SequenceMatcher(lambda x: x.isspace(), curr, cat.name.lower()).ratio()
+            # TODO: debug log this
+            # print(f"{curr} match {cat.name}: {sim}\n {sim * ((len(cat.name) + 1) / len(curr))**2}\n")
+            if sim * ((len(cat.name) + 1) / len(curr)) ** 2 >= MATCH_HEURISTIC:
+                similarities[app_commands.Choice(name=cat.name, value=cat.name)] = sim
+        return sorted(similarities.keys(), key=lambda x: similarities[x], reverse=True)
 
     @app_commands.command(description="Get help for commands")
     async def help(
         self,
-        interaction: discord.Interaction,
+        interaction: Interaction,
     ):
         PREFIX = "/"
         embed = discord.Embed(
@@ -94,7 +127,7 @@ class TransitionCommands(commands.Cog):
         )
 
     @staticmethod
-    async def delete_role(role_name: str, interaction: discord.Interaction):
+    async def delete_role(role_name: str, interaction: Interaction):
         # Just in case the user sent "9B Mitchell" like the category name
         role_name = role_name.replace(" ", "-")
 
@@ -103,7 +136,7 @@ class TransitionCommands(commands.Cog):
         await role.delete()  # type: ignore  --- if None, will error, caller handles this
 
     async def get_valid_category(
-        self, interaction: discord.Interaction, arg: Optional[str]
+        self, interaction: Interaction, arg: Optional[str]
     ) -> Optional[discord.CategoryChannel]:
         if not arg:
             await interaction.response.send_message("Error: what category are you trying to erase?")
@@ -127,7 +160,7 @@ class TransitionCommands(commands.Cog):
 
     @app_commands.command(description="Erase specified category")
     @app_commands.describe(category="Category to erase")
-    async def erase(self, interaction: discord.Interaction, category: Optional[str]):
+    async def erase(self, interaction: Interaction, category: Optional[str]):
         to_erase = await self.get_valid_category(interaction, category)
         if not to_erase:
             return
@@ -153,9 +186,13 @@ class TransitionCommands(commands.Cog):
         except:
             pass  # Role was already deleted, we can just fail quietly
 
+    @erase.autocomplete("category")
+    async def erase_ac(self, interaction: Interaction, curr: str) -> list[Choice[str]]:
+        return await self.base_autocomplete(interaction, curr, self._archived_pattern)
+
     @app_commands.command(description="Archive specified category")
     @app_commands.describe(category="Category to archive")
-    async def archive(self, interaction: discord.Interaction, category: Optional[str]):
+    async def archive(self, interaction: Interaction, category: Optional[str]):
         if interaction.guild is None:
             # TODO: should log idk. this should also just be unreachable!() so, idk.
             return await interaction.response.send_message("Internal Error :(")
@@ -171,6 +208,7 @@ class TransitionCommands(commands.Cog):
             if "[archived]" in cat.name.lower():
                 pos = interaction.guild.categories.index(cat) - 1
                 break
+        print(f"Move position: {pos}")
         await to_archive.edit(name=f"{name} [ARCHIVED]", position=pos)
         # Attempt to delete the associated role, and quietly fail if impossible
         try:
@@ -188,9 +226,13 @@ class TransitionCommands(commands.Cog):
 
         return await interaction.response.edit_message(content=f"Archived {name}")
 
+    @archive.autocomplete("category")
+    async def archive_ac(self, interaction: Interaction, curr: str) -> list[Choice[str]]:
+        return await self.base_autocomplete(interaction, curr, self._unarchived_pattern)
+
     @app_commands.command(description="Create specified category")
     @app_commands.describe(name="Name of category")
-    async def create(self, interaction: discord.Interaction, name: Optional[str]):
+    async def create(self, interaction: Interaction, name: Optional[str]):
         if not name:
             return await interaction.response.send_message(
                 "Error: what category are you trying to create?"
@@ -247,7 +289,7 @@ class TransitionCommands(commands.Cog):
         )
 
     @app_commands.command(description="Create specified category")
-    async def strip(self, interaction: discord.Interaction):
+    async def strip(self, interaction: Interaction):
         # Again, this is for the benefit of type checkers
         if interaction.guild is None:
             return await interaction.response.send_message("Internal Error :(")
@@ -258,11 +300,8 @@ class TransitionCommands(commands.Cog):
             r = self.match_case_insensitive_name(role, interaction.guild.roles)
             if r is not None:
                 roles.append(r)
-        
         # Now the list is full of actual roles!
         count = 0
-
-        # https://www.reddit.com/r/discordapp/comments/8yvq4g/get_all_users_with_a_role_using_discordpy/
         for role in roles:
             for member in role.members:
                 await member.remove_roles(role)
@@ -303,7 +342,7 @@ class TransitionCommands(commands.Cog):
 
     @app_commands.command(description="Create specified category")
     @app_commands.describe(category="Category to duplicate")
-    async def duplicate(self, interaction: discord.Interaction, category: Optional[str]):
+    async def duplicate(self, interaction: Interaction, category: str):
         if interaction.guild is None:
             return await interaction.response.send_message("Internal Error :(")
         if not category:
@@ -323,10 +362,14 @@ class TransitionCommands(commands.Cog):
         for c in old.channels:
             clone = await c.clone()
             await clone.edit(category=new)  # type: ignore
-        await old.edit(name=f"{old.name} [ARCHIVE]", position=1000)
+        await old.edit(name=f"{old.name} [ARCHIVED]", position=1000)
         return await interaction.followup.edit_message(
             (await interaction.original_response()).id, content=f"Duplicated {new.name}"
         )
+
+    @duplicate.autocomplete("category")
+    async def duplicate_ac(self, interaction: Interaction, curr: str) -> list[Choice[str]]:
+        return await self.base_autocomplete(interaction, curr, self._unarchived_pattern)
 
 
 async def setup(bot: commands.Bot):
