@@ -1,10 +1,29 @@
+import asyncio
+
 import discord
 from discord.ext import commands
 from env import TOKEN, PREFIX
 
+
 intents = discord.Intents.all()
+intents.presences = intents.members = False
 client = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
+@client.check
+async def require_admin(ctx: commands.Context):
+    """Require all commands to be issued by a server administrator
+    
+    In the future, we might want to deal a little more granularly with permissions but
+    for now, this seems fine to me. All relevant roles are administrator only, so it
+    should be fine to use this for now.
+    """
+    return ctx.guild is not None and ctx.permissions.administrator
+
+@client.event
+async def on_command_error(ctx: commands.Context, err: commands.CommandError):
+    if isinstance(err, commands.CheckFailure):
+        return await ctx.send("Invalid Permissions", ephemeral=True)
+    await commands.Bot.on_command_error(client, ctx, err)
 
 @client.event
 async def on_ready():
@@ -107,7 +126,6 @@ async def _delete_role(role_name, ctx):
 
 
 @client.command(aliases=["remove", "delete", "purge", "nuke"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def erase(ctx, *, arg):
     if not arg:
         return await ctx.send("Error: what category are you trying to erase?")
@@ -141,7 +159,6 @@ async def erase(ctx, *, arg):
 
 
 @client.command(aliases=["hide", "shelve"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def archive(ctx, *, arg):
     if not arg:
         return await ctx.send("Error: what category are you trying to archive?")
@@ -163,26 +180,25 @@ async def archive(ctx, *, arg):
     # Place the new category before the first category with [ARCHIVED] in its
     # name
     pos = len(ctx.guild.categories)
+    name = to_archive.name
     for category in ctx.guild.categories:
         if "[archived]" in category.name.lower():
             pos = ctx.guild.categories.index(category) - 1
             break
-    await to_archive.edit(name=f"{str(to_archive)} [ARCHIVED]", position=pos)
+    await to_archive.edit(name=f"{name} [ARCHIVED]", position=pos)
 
     # Attempt to delete the associated role, and quietly fail if impossible
     try:
         role_to_erase = to_archive.name.replace(" [ARCHIVED]", "").strip()
         await _delete_role(role_to_erase, ctx)
     except Exception as e:
-        print(e)
         await ctx.send(f'Something went wrong trying to delete the role '
-                        'associated with this category')
+                       f'associated with this category: {e}')
 
     return await ctx.send("Done :3")
 
 
 @client.command(aliases=["add"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def create(ctx, *, name=None):
     if not name:
         return await ctx.send("Error: what category are you trying to create?")
@@ -236,7 +252,6 @@ async def create(ctx, *, name=None):
 
 
 @client.command(aliases=[])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def strip(ctx):
     roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
     roles = []
@@ -292,7 +307,6 @@ async def find(ctx, *, role_name):
 
 
 @client.command(aliases=["dup", "clone"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
 async def duplicate(ctx, *, arg):
     old = ""
     stop = True
@@ -322,5 +336,9 @@ async def duplicate(ctx, *, arg):
 
     return await ctx.send("Done :3")
 
+async def main():
+    async with client:
+        await client.start(TOKEN)
 
-client.run(TOKEN)
+if __name__ == "__main__":
+    asyncio.run(main())
