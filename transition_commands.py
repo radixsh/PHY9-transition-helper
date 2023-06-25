@@ -1,12 +1,14 @@
 import difflib
 import re
 from typing import Optional
+import logging
+import logging.handlers
 
 import discord
-from discord import Interaction
 import discord.app_commands as app_commands
-from discord.app_commands import Choice
 import discord.ext.commands as commands
+from discord import Interaction
+from discord.app_commands import Choice
 
 MATCH_HEURISTIC = 1.0
 
@@ -315,11 +317,6 @@ class TransitionCommands(commands.Cog):
     async def find(self, ctx: commands.Context, *, role_name: Optional[str]):
         if role_name is None or ctx.guild is None:
             return await ctx.send(f"Error: what role are you trying to " "investigate?")
-        # FIXME: this appears to be getting the correct role, but not the members.
-        # intents issue?
-        # if so, is this worth keeping? would be kinda nice to take this off of privileged
-        # intents if we can, and this is available in just the discord UI if you can run this
-        # command anyway
         role_name = role_name.lower()
 
         role = self.match_case_insensitive_name(role_name, ctx.guild.roles)

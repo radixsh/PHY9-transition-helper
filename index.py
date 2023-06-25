@@ -2,7 +2,8 @@ import asyncio
 
 import discord
 from discord.ext import commands
-from env import TOKEN, PREFIX, DEBUG_ID
+
+from env import DEBUG_ID, PREFIX, TOKEN
 
 DEBUG_SERVER = discord.Object(id=DEBUG_ID)
 
