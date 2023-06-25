@@ -58,7 +58,7 @@ async def re_err(ctx: commands.Context, err):
 
 
 @client.event
-async def on_message(message):
+async def on_message(message: discord.Message):
     if message.author == client.user:
         return
     await client.process_commands(message)

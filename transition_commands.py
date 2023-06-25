@@ -1,3 +1,5 @@
+from typing import Optional
+
 import discord
 import discord.ext.commands as commands
 
@@ -6,8 +8,11 @@ class TransitionCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot: commands.Bot = bot
 
+    def cog_check(self, _):
+        return commands.guild_only()
+
     @commands.command(aliases=["h"])
-    async def help(self, ctx):
+    async def help(self, ctx: commands.Context):
         # FIXME: this is a temporary hack because I don't want to spend a bunch of time fixing the
         # prefix in the help command immediately before removing the concept of prefixes altogether
         # Thus, it's just quickly hardcoded. Hoewver, once the migration to slash commands is done,
@@ -67,7 +72,7 @@ class TransitionCommands(commands.Cog):
         return await ctx.send(embed=embed)
 
     @staticmethod
-    def _find_match(needle, haystack):
+    def match_case_insensitive_name(needle: str, haystack):
         for category in haystack:
             if needle.lower() == category.name.lower():
                 return category
@@ -79,71 +84,73 @@ class TransitionCommands(commands.Cog):
         )
 
     @staticmethod
-    async def _delete_role(role_name, ctx):
+    async def delete_role(role_name: str, ctx: commands.Context):
         # Just in case the user sent "9B Mitchell" like the category name
         role_name = role_name.replace(" ", "-")
 
-        # _find_match() is not case-sensitive
-        role = TransitionCommands._find_match(role_name, ctx.guild.roles)
-        try:
+        # We require that all commands in this cog are guild only, so guild.roles cannot be None
+        role = TransitionCommands.match_case_insensitive_name(role_name, ctx.guild.roles)  # type: ignore
+        if role:
             await role.delete()
             await ctx.send(f'Deleted role "{role_name}"')
-        except:
+        else:
             await ctx.send(f"Role not found :(")
 
-    @commands.command(aliases=["remove", "delete", "purge", "nuke"])
-    async def erase(self, ctx, *, arg):
+    async def get_valid_category(
+        self, ctx: commands.Context, arg: Optional[str]
+    ) -> Optional[discord.CategoryChannel]:
         if not arg:
-            return await ctx.send("Error: what category are you trying to erase?")
-
+            await ctx.send("Error: what category are you trying to erase?")
+            return
+        category: Optional[discord.CategoryChannel] = None
         if arg == "this":
-            to_erase = ctx.channel.category
+            if hasattr(ctx.channel, "category"):
+                category = ctx.channel.category  # type: ignore
+            else:
+                print("No category found under `this`")
         else:
-            to_erase = self._find_match(arg, ctx.guild.categories)
-            if not to_erase:
-                return await ctx.send(f"No such category found")
+            # Again, cog-wide check guarantees we are in a guild.
+            category = self.match_case_insensitive_name(arg, ctx.guild.categories)  # type: ignore
+        if not category:
+            await ctx.send(f"No such category found")
+            return
+        if self._is_protected(category):
+            await ctx.send(f"Permission denied: cannot mutate non-section category {category}")
+            return
+        return category
 
-        if self._is_protected(to_erase) or "archive" not in to_erase.name.lower():
-            return await ctx.send(f"Illegal!")
-
+    @commands.command(aliases=["remove", "delete", "purge", "nuke"])
+    async def erase(self, ctx: commands.Context, *, arg: Optional[str]):
+        to_erase = await self.get_valid_category(ctx, arg)
+        if not to_erase:
+            print("No valid category")
+            return
+        elif "archive" not in to_erase.name.lower():
+            await ctx.send(f"Permission denied: cannot erase non-archived category {to_erase}")
+            return
         for c in to_erase.channels:
             await c.delete()
         await to_erase.delete()
-
-        # Quietly fail if the channel in which the command was sent has been deleted
+        # Don't send feedback if context channel was just deleted
         if arg != "this":
             await ctx.send(f"Successfully deleted category {to_erase.name}")
-
         # Attempt to delete the associated role, and quietly fail if impossible
+        # TODO: do we need to keep this? role should be deleted in the archive process already.
         try:
             role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
-            await self._delete_role(role_to_erase, ctx)
+            await self.delete_role(role_to_erase, ctx)
         except:
             await ctx.send(
                 f"Something went wrong trying to delete the role " "associated with this category"
             )
 
     @commands.command(aliases=["hide", "shelve"])
-    async def archive(self, ctx, *, arg):
-        if not arg:
-            return await ctx.send("Error: what category are you trying to archive?")
-
-        if arg == "this":
-            # We choose the category that the command message was sent in
-            to_archive = ctx.channel.category
-        else:
-            # We look for the matching category and choose any match
-            to_archive = self._find_match(arg, ctx.guild.categories)
-            if not to_archive:
-                return await ctx.send(f"No such category found")
-
-        # We are only allowed to delete categories whose names start with "9" (i.e.,
-        # are in the format 9C Mitchell).
-        if self._is_protected(to_archive):
-            return await ctx.send(f"Illegal!")
-
-        # Place the new category before the first category with [ARCHIVED] in its
-        # name
+    async def archive(self, ctx: commands.Context, *, arg: Optional[str]):
+        to_archive = await self.get_valid_category(ctx, arg)
+        # The second check isn't strictly necessary but it makes type checkers happy.
+        if to_archive is None or ctx.guild is None:
+            return
+        # Place the new category before the first category with [ARCHIVED] in its name
         pos = len(ctx.guild.categories)
         name = to_archive.name
         for category in ctx.guild.categories:
@@ -154,8 +161,8 @@ class TransitionCommands(commands.Cog):
 
         # Attempt to delete the associated role, and quietly fail if impossible
         try:
-            role_to_erase = to_archive.name.replace(" [ARCHIVED]", "").strip()
-            await self._delete_role(role_to_erase, ctx)
+            role_to_erase = name.replace(" [ARCHIVED]", "").strip()
+            await self.delete_role(role_to_erase, ctx)
         except Exception as e:
             await ctx.send(
                 f"Something went wrong trying to delete the role "
@@ -165,14 +172,19 @@ class TransitionCommands(commands.Cog):
         return await ctx.send("Done :3")
 
     @commands.command(aliases=["add"])
-    async def create(self, ctx, *, name=None):
+    async def create(self, ctx: commands.Context, *, name: Optional[str]):
         if not name:
             return await ctx.send("Error: what category are you trying to create?")
+        # Again, not strictly necessary, but we aren't trying to maximize performance here and
+        # this hints to the type checker that this can't be none, which is already checked in
+        # a more user friendly way in the cog_check.
+        if ctx.guild is None:
+            return
 
         # Transform "9c mitchell" to "9C Mitchell" for channel name
-        name = [letter.capitalize() for letter in name.split(" ")]
-        name[0] = name[0].upper()
-        name = " ".join(name)
+        name_split = [word.capitalize() for word in name.split(" ")]
+        name_split[0] = name_split[0].upper()
+        name = " ".join(name_split)
 
         # Create corresponding role
         hyphenated_name = name.replace(" ", "-")
@@ -201,7 +213,7 @@ class TransitionCommands(commands.Cog):
         # Create the category
         await ctx.send(f"Creating new category {name}")
         new_category = await ctx.guild.create_category(
-            name=name, overwrites=overwrites, position=pos
+            name=name, overwrites=overwrites, position=pos  # type: ignore
         )
 
         # Populate the new category with channels
@@ -214,11 +226,14 @@ class TransitionCommands(commands.Cog):
         return await ctx.send("Done :3")
 
     @commands.command(aliases=[])
-    async def strip(self, ctx):
+    async def strip(self, ctx: commands.Context):
+        # Again, this is for the benefit of type checkers
+        if ctx.guild is None:
+            return
         roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
         roles = []
         for role in roles_to_strip:
-            roles.append(self._find_match(role, ctx.guild.roles))
+            roles.append(self.match_case_insensitive_name(role, ctx.guild.roles))
 
         # Now the list is full of actual roles!
         count = 0
@@ -229,25 +244,20 @@ class TransitionCommands(commands.Cog):
                 if role.name in roles:
                     await member.remove_roles(role)
                     count += 1
-        # for role in roles:
-        #     for member in role.members:
-        #         await member.remove_roles(role)
-        #         count += 1
         return await ctx.send(f"Removed roles {', '.join(roles_to_strip)} from {count} members :)")
 
     @commands.command(aliases=["list"])
-    async def find(self, ctx, *, role_name):
-        if not role_name:
+    async def find(self, ctx: commands.Context, *, role_name: Optional[str]):
+        if role_name is None or ctx.guild is None:
             return await ctx.send(f"Error: what role are you trying to " "investigate?")
-
+        # FIXME: this appears to be getting the correct role, but not the members.
+        # intents issue?
+        # if so, is this worth keeping? would be kinda nice to take this off of privileged
+        # intents if we can, and this is available in just the discord UI if you can run this
+        # command anyway
         role_name = role_name.lower()
 
-        # role = None
-        # for real_role in ctx.guild.roles:
-        #     if real_role.name.lower() == role_name:
-        #         role = real_role
-        #         break
-        role = self._find_match(role_name, ctx.guild.roles)
+        role = self.match_case_insensitive_name(role_name, ctx.guild.roles)
         if role is None:
             return await ctx.send("That role does not exist!")
 
@@ -266,22 +276,23 @@ class TransitionCommands(commands.Cog):
             await ctx.send(page)
 
     @commands.command(aliases=["dup", "clone"])
-    async def duplicate(self, ctx, *, arg):
-        old = ""
-        stop = True
+    async def duplicate(self, ctx: commands.Context, *, arg):
+        if ctx.guild is None:
+            return
+        old: Optional[discord.CategoryChannel] = None
         for category in ctx.guild.categories:
             if arg.lower() == category.name.lower():
                 old = category
-                stop = False
                 break
-        if stop:
+        if old is None:
             return await ctx.send(f"No such category found")
 
         # Copy the old category's roles/perms to the new category
         new = await ctx.guild.create_category(
-            f"{old.name}", overwrites=old.overwrites, position=old.position
+            f"{old.name}", overwrites=old.overwrites, position=old.position  # type: ignore
         )
 
+        # FIXME: overwrites assignment appears unused. what's this for, and is it necessary?
         for c in old.channels:
             if not c.permissions_synced:
                 overwrites = c.overwrites
@@ -289,7 +300,7 @@ class TransitionCommands(commands.Cog):
                 overwrites = old.overwrites
 
             clone = await c.clone()
-            await clone.edit(category=new)
+            await clone.edit(category=new)  # type: ignore
 
         await old.edit(name=f"{old.name} [ARCHIVE]", position=1000)
 
