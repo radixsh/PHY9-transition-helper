@@ -285,7 +285,7 @@ class TransitionCommands(commands.Cog):
         await new_category.create_text_channel("discussion")
         await new_category.create_voice_channel(name)
         await interaction.followup.edit_message(
-            (await interaction.original_response()).id, content=f"Creating new category {name}"
+            (await interaction.original_response()).id, content=f"Created new category {name}."
         )
 
     @app_commands.command(description="Create specified category")
