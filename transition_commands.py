@@ -1,8 +1,7 @@
 import difflib
+import logging
 import re
 from typing import Optional
-import logging
-import logging.handlers
 
 import discord
 import discord.app_commands as app_commands
@@ -16,6 +15,7 @@ MATCH_HEURISTIC = 1.0
 class TransitionCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot: commands.Bot = bot
+        self.logger = logging.getLogger("discord.bot.transition")
         self._unarchived_pattern = re.compile(r"9[A-D]H?\s+[-\w]+", re.IGNORECASE)
         self._archived_pattern = re.compile(r"9[A-D]H?\s+\w+\s+\[ARCHIVED?\]", re.IGNORECASE)
 
@@ -26,10 +26,13 @@ class TransitionCommands(commands.Cog):
         for now, this seems fine to me. All relevant roles are administrator only, so it
         should be fine to use this for now.
         """
+        self.logger.debug("Command cog-wide check")
         return ctx.guild is not None and ctx.permissions.administrator
 
     def interaction_check(self, interaction: Interaction) -> bool:
         """See cog_check method"""
+        self.logger.debug("Interaction cog-wide check: Guild: %s, perms: %x", interaction.guild_id,
+                          interaction.permissions.value)
         return interaction.guild is not None and interaction.permissions.administrator
 
     @staticmethod
@@ -128,14 +131,14 @@ class TransitionCommands(commands.Cog):
             not category.name.startswith("9") and not category.name.lower().startswith("phy")
         )
 
-    @staticmethod
-    async def delete_role(role_name: str, interaction: Interaction):
+    async def delete_role(self, role_name: str, interaction: Interaction):
         # Just in case the user sent "9B Mitchell" like the category name
         role_name = role_name.replace(" ", "-")
 
         # We require that all commands in this cog are guild only, so guild.roles cannot be None
         role = TransitionCommands.match_case_insensitive_name(role_name, interaction.guild.roles)  # type: ignore
         await role.delete()  # type: ignore  --- if None, will error, caller handles this
+        self.logger.info("Deleted role %s", role_name)
 
     async def get_valid_category(
         self, interaction: Interaction, arg: Optional[str]
@@ -154,6 +157,9 @@ class TransitionCommands(commands.Cog):
             await interaction.response.send_message("No such category found")
             return
         if self._is_protected(category):
+            self.logger.info(
+                "%s requested mutation of invalid category %s", interaction.user.name, category.name
+            )
             await interaction.response.send_message(
                 f"Permission denied: cannot mutate non-section category {category}"
             )
@@ -166,7 +172,11 @@ class TransitionCommands(commands.Cog):
         to_erase = await self.get_valid_category(interaction, category)
         if not to_erase:
             return
-        elif "archive" not in to_erase.name.lower():
+        self.logger.info("%s requested deletion of %s", interaction.user.name, to_erase.name)
+        if "archive" not in to_erase.name.lower():
+            self.logger.info(
+                "%s requested deletion of invalid category %s", interaction.user.name, to_erase.name
+            )
             return await interaction.response.send_message(
                 f"Permission denied: cannot erase non-archived category {to_erase}"
             )
@@ -182,11 +192,11 @@ class TransitionCommands(commands.Cog):
             )
         # Attempt to delete the associated role, and quietly fail if impossible
         # TODO: do we need to keep this? role should be deleted in the archive process already.
+        role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
         try:
-            role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
             await self.delete_role(role_to_erase, interaction)
         except:
-            pass  # Role was already deleted, we can just fail quietly
+            self.logger.info("Role deletion of %s failed", role_to_erase)
 
     @erase.autocomplete("category")
     async def erase_ac(self, interaction: Interaction, curr: str) -> list[Choice[str]]:
@@ -196,12 +206,13 @@ class TransitionCommands(commands.Cog):
     @app_commands.describe(category="Category to archive")
     async def archive(self, interaction: Interaction, category: Optional[str]):
         if interaction.guild is None:
-            # TODO: should log idk. this should also just be unreachable!() so, idk.
+            self.logger.error("Archive guild None")
             return await interaction.response.send_message("Internal Error :(")
         to_archive = await self.get_valid_category(interaction, category)
         # The second check isn't strictly necessary but it makes type checkers happy.
         if to_archive is None:
             return
+        self.logger.info("%s requested archive of %s", interaction.user.name, to_archive.name)
         await interaction.response.defer()
         # Place the new category before the first category with [ARCHIVED] in its name
         pos = len(interaction.guild.categories)
@@ -210,23 +221,23 @@ class TransitionCommands(commands.Cog):
             if "[archived]" in cat.name.lower():
                 pos = interaction.guild.categories.index(cat) - 1
                 break
-        print(f"Move position: {pos}")
+        self.logger.debug("Move %s to position %d", to_archive.name, pos)
         await to_archive.edit(name=f"{name} [ARCHIVED]", position=pos)
         # Attempt to delete the associated role, and quietly fail if impossible
+        role_to_erase = name.replace(" [ARCHIVED]", "").strip()
         try:
-            role_to_erase = name.replace(" [ARCHIVED]", "").strip()
             await self.delete_role(role_to_erase, interaction)
-            await interaction.followup.edit_message(
-                (await interaction.original_response()).id, content=f"Archived category {name}"
-            )
         except Exception as e:
+            self.logger.error("Error deleting role %s", role_to_erase)
             await interaction.followup.edit_message(
                 (await interaction.original_response()).id,
                 content=f"Archived category {name}\n"
                 f"Something went wrong deleting the role associated with this category.",
             )
-
-        return await interaction.response.edit_message(content=f"Archived {name}")
+            return
+        await interaction.followup.edit_message(
+            (await interaction.original_response()).id, content=f"Archived category {name}"
+        )
 
     @archive.autocomplete("category")
     async def archive_ac(self, interaction: Interaction, curr: str) -> list[Choice[str]]:
@@ -243,14 +254,15 @@ class TransitionCommands(commands.Cog):
         # this hints to the type checker that this can't be none, which is already checked in
         # a more user friendly way in the cog_check.
         if interaction.guild is None:
+            self.logger.error("Create guild None")
             return await interaction.response.send_message("Internal Error :(")
 
+        self.logger.info("%s requested creation of %s", interaction.user.name, name)
         await interaction.response.defer()
         # Transform "9c mitchell" to "9C Mitchell" for channel name
         name_split = [word.capitalize() for word in name.split(" ")]
         name_split[0] = name_split[0].upper()
         name = " ".join(name_split)
-
         # Create corresponding role
         hyphenated_name = name.replace(" ", "-")
         new_role = await interaction.guild.create_role(name=hyphenated_name)
@@ -286,6 +298,7 @@ class TransitionCommands(commands.Cog):
         await new_category.create_text_channel("homework")
         await new_category.create_text_channel("discussion")
         await new_category.create_voice_channel(name)
+        self.logger.info("Created new category %s", name)
         await interaction.followup.edit_message(
             (await interaction.original_response()).id, content=f"Created new category {name}."
         )
@@ -294,6 +307,7 @@ class TransitionCommands(commands.Cog):
     async def strip(self, interaction: Interaction):
         # Again, this is for the benefit of type checkers
         if interaction.guild is None:
+            self.logger.error("Strip guild None")
             return await interaction.response.send_message("Internal Error :(")
         await interaction.response.defer()
         roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
@@ -308,9 +322,11 @@ class TransitionCommands(commands.Cog):
             for member in role.members:
                 await member.remove_roles(role)
                 count += 1
+        response_str = f"Removed roles {', '.join(roles_to_strip)} from {count} members."
+        self.logger.info(response_str)
         await interaction.followup.edit_message(
             (await interaction.original_response()).id,
-            content=f"Removed roles {', '.join(roles_to_strip)} from {count} members :)",
+            content=response_str,
         )
 
     @commands.command(aliases=["list"])
@@ -341,17 +357,21 @@ class TransitionCommands(commands.Cog):
     @app_commands.describe(category="Category to duplicate")
     async def duplicate(self, interaction: Interaction, category: str):
         if interaction.guild is None:
+            self.logger.error("Duplicate guild None")
             return await interaction.response.send_message("Internal Error :(")
         if not category:
             return await interaction.response.send_message("Must provide category name")
+        self.logger.info("%s requested duplication of %s", interaction.user.name, category)
         old: Optional[discord.CategoryChannel] = None
         for cat in interaction.guild.categories:
             if category.lower() == cat.name.lower():
                 old = cat
                 break
         if old is None:
+            self.logger.info("Duplicate: category %s not found", category)
             return await interaction.response.send_message(f"No such category found")
         await interaction.response.defer(thinking=True)
+        self.logger.info("Duplicating %s", category)
         # Copy the old category's roles/perms to the new category
         new = await interaction.guild.create_category(
             f"{old.name}", overwrites=old.overwrites, position=old.position  # type: ignore
@@ -360,6 +380,7 @@ class TransitionCommands(commands.Cog):
             clone = await c.clone()
             await clone.edit(category=new)  # type: ignore
         await old.edit(name=f"{old.name} [ARCHIVED]", position=1000)
+        self.logger.info("Duplicated %s", category)
         return await interaction.followup.edit_message(
             (await interaction.original_response()).id, content=f"Duplicated {new.name}"
         )

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 from discord.ext import commands
@@ -14,9 +15,34 @@ client = commands.Bot(
 )
 
 
+base_logger = logging.getLogger("discord")
+base_logger.setLevel(logging.INFO)
+
+file_handler = logging.FileHandler("discord.log")
+file_formatter = logging.Formatter(
+    "[%(asctime).23s] [%(levelname)] %(name)s | %(message)s", datefmt="%Y-%M-%d:%H:%M:%S"
+)
+file_handler.setFormatter(file_formatter)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.WARNING)
+console_formatter = logging.Formatter("[%(levelname)] %(name)s | %(message)s")
+console_handler.setFormatter(console_formatter)
+
+base_logger.addHandler(file_handler)
+base_logger.addHandler(console_handler)
+
+bot_logger = logging.getLogger("discord.bot")
+bot_logger.setLevel(logging.DEBUG)
+
+
 @client.event
 async def on_command_error(ctx: commands.Context, err: commands.CommandError):
     if isinstance(err, commands.CheckFailure):
+        if ctx.command:
+            bot_logger.info("%s: Invalid permissions for %s", ctx.author.name, ctx.command.name)
+        else:
+            bot_logger.error("%s: Check Failure with no command", ctx.author.name)
         return await ctx.send("Invalid Permissions", ephemeral=True)
     await commands.Bot.on_command_error(client, ctx, err)
 
@@ -25,11 +51,10 @@ async def on_command_error(ctx: commands.Context, err: commands.CommandError):
 async def on_ready():
     print(f"Logged in as {client.user}!")
     await client.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.listening, name=f"{PREFIX}help")
+        activity=discord.Activity(type=discord.ActivityType.listening, name=f"/help")
     )
-    print("\nServers: ")
     for guild in client.guilds:
-        print(f"- {guild.name} ({guild.member_count} members)")
+        bot_logger.info(f"{guild.name} ({guild.member_count} members)")
 
 
 @client.command()
@@ -64,10 +89,21 @@ async def global_sync(ctx: commands.Context):
 @reload.error
 @dev_sync.error
 @global_sync.error
-async def re_err(ctx: commands.Context, err):
-    """Likely a permissions error. Should log this, once that's setup."""
-    # FIXME: should probably log this
-    return
+async def re_err(ctx: commands.Context, err: Exception):
+    """Likely a permissions error."""
+    if isinstance(err, commands.CheckFailure):
+        bot_logger.info(
+            "%s (id %d) attempted to use owner-only function.",
+            ctx.author.name,
+            ctx.author.id,
+        )
+    else:
+        bot_logger.error(
+            "%s running %s: %s",
+            err.__class__.__name__,
+            ctx.command.name if ctx.command else "Unknown Command",
+            err
+        )
 
 
 @client.event
