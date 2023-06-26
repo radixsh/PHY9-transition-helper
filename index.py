@@ -134,7 +134,8 @@ async def erase(ctx, *, arg):
     try:
         role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
         await _delete_role(role_to_erase, ctx)
-    except:
+    except Exception as e:
+        print(e)
         await ctx.send(f'Something went wrong trying to delete the role '
                         'associated with this category')
 
@@ -170,9 +171,10 @@ async def archive(ctx, *, arg):
 
     # Attempt to delete the associated role, and quietly fail if impossible
     try:
-        role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
+        role_to_erase = to_archive.name.replace(" [ARCHIVED]", "").strip()
         await _delete_role(role_to_erase, ctx)
-    except:
+    except Exception as e:
+        print(e)
         await ctx.send(f'Something went wrong trying to delete the role '
                         'associated with this category')
 
