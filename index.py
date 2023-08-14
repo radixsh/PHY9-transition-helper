@@ -80,7 +80,7 @@ async def dev_sync(ctx: commands.Context):
 @client.command(name="global-sync", hidden=True)
 @commands.is_owner()
 async def global_sync(ctx: commands.Context):
-    """Sync current command tree to dev discord server"""
+    """Sync current command tree to all of discord"""
     await ctx.send("Initiating global sync...")
     await client.tree.sync()
     await ctx.reply(f"Synced global command tree to development server", mention_author=True)
