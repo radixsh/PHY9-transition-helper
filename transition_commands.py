@@ -31,8 +31,11 @@ class TransitionCommands(commands.Cog):
 
     def interaction_check(self, interaction: Interaction) -> bool:
         """See cog_check method"""
-        self.logger.debug("Interaction cog-wide check: Guild: %s, perms: %x", interaction.guild_id,
-                          interaction.permissions.value)
+        self.logger.debug(
+            "Interaction cog-wide check: Guild: %s, perms: %x",
+            interaction.guild_id,
+            interaction.permissions.value,
+        )
         return interaction.guild is not None and interaction.permissions.administrator
 
     @staticmethod
@@ -228,7 +231,7 @@ class TransitionCommands(commands.Cog):
         try:
             await self.delete_role(role_to_erase, interaction)
         except Exception as e:
-            self.logger.error("Error deleting role %s", role_to_erase)
+            self.logger.error("Error deleting role %s: %s", role_to_erase, e)
             await interaction.followup.edit_message(
                 (await interaction.original_response()).id,
                 content=f"Archived category {name}\n"
@@ -303,7 +306,7 @@ class TransitionCommands(commands.Cog):
             (await interaction.original_response()).id, content=f"Created new category {name}."
         )
 
-    @app_commands.command(description="Create specified category")
+    @app_commands.command(description="Remove 9A, 9B, etc. roles from users.")
     async def strip(self, interaction: Interaction):
         # Again, this is for the benefit of type checkers
         if interaction.guild is None:
@@ -352,42 +355,6 @@ class TransitionCommands(commands.Cog):
             paginator.add_line(line)
         for page in paginator.pages:
             await ctx.send(page)
-
-    @app_commands.command(description="Create specified category")
-    @app_commands.describe(category="Category to duplicate")
-    async def duplicate(self, interaction: Interaction, category: str):
-        if interaction.guild is None:
-            self.logger.error("Duplicate guild None")
-            return await interaction.response.send_message("Internal Error :(")
-        if not category:
-            return await interaction.response.send_message("Must provide category name")
-        self.logger.info("%s requested duplication of %s", interaction.user.name, category)
-        old: Optional[discord.CategoryChannel] = None
-        for cat in interaction.guild.categories:
-            if category.lower() == cat.name.lower():
-                old = cat
-                break
-        if old is None:
-            self.logger.info("Duplicate: category %s not found", category)
-            return await interaction.response.send_message(f"No such category found")
-        await interaction.response.defer(thinking=True)
-        self.logger.info("Duplicating %s", category)
-        # Copy the old category's roles/perms to the new category
-        new = await interaction.guild.create_category(
-            f"{old.name}", overwrites=old.overwrites, position=old.position  # type: ignore
-        )
-        for c in old.channels:
-            clone = await c.clone()
-            await clone.edit(category=new)  # type: ignore
-        await old.edit(name=f"{old.name} [ARCHIVED]", position=1000)
-        self.logger.info("Duplicated %s", category)
-        return await interaction.followup.edit_message(
-            (await interaction.original_response()).id, content=f"Duplicated {new.name}"
-        )
-
-    @duplicate.autocomplete("category")
-    async def duplicate_ac(self, interaction: Interaction, curr: str) -> list[Choice[str]]:
-        return await self.base_autocomplete(interaction, curr, self._unarchived_pattern)
 
 
 async def setup(bot: commands.Bot):
