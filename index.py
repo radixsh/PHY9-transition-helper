@@ -1,326 +1,126 @@
+import asyncio
+import logging
+
 import discord
 from discord.ext import commands
-from env import TOKEN, PREFIX
+
+from env import DEBUG_ID, PREFIX, TOKEN
+
+DEBUG_SERVER = discord.Object(id=DEBUG_ID)
 
 intents = discord.Intents.all()
-client = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
+intents.presences = intents.message_content = False
+client = commands.Bot(
+    command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None
+)
+
+
+base_logger = logging.getLogger("discord")
+base_logger.setLevel(logging.INFO)
+
+file_handler = logging.FileHandler("discord.log")
+file_formatter = logging.Formatter(
+    "[%(asctime).23s] [%(levelname)] %(name)s | %(message)s", datefmt="%Y-%M-%d:%H:%M:%S"
+)
+file_handler.setFormatter(file_formatter)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.WARNING)
+console_formatter = logging.Formatter("[%(levelname)] %(name)s | %(message)s")
+console_handler.setFormatter(console_formatter)
+
+base_logger.addHandler(file_handler)
+base_logger.addHandler(console_handler)
+
+bot_logger = logging.getLogger("discord.bot")
+bot_logger.setLevel(logging.DEBUG)
+
+
+@client.event
+async def on_command_error(ctx: commands.Context, err: commands.CommandError):
+    if isinstance(err, commands.CheckFailure):
+        if ctx.command:
+            bot_logger.info("%s: Invalid permissions for %s", ctx.author.name, ctx.command.name)
+        else:
+            bot_logger.error("%s: Check Failure with no command", ctx.author.name)
+        return await ctx.send("Invalid Permissions", ephemeral=True)
+    await commands.Bot.on_command_error(client, ctx, err)
 
 
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}!")
     await client.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.listening, name=f"{PREFIX}help"
-        )
+        activity=discord.Activity(type=discord.ActivityType.listening, name=f"/help")
     )
-    print("\nServers: ")
     for guild in client.guilds:
-        print(f"- {guild.name} ({guild.member_count} members)")
+        bot_logger.info(f"{guild.name} ({guild.member_count} members)")
+
+
+@client.command()
+@commands.is_owner()
+async def reload(ctx: commands.Context):
+    try:
+        await client.reload_extension("transition_commands")
+    except Exception as e:
+        await ctx.send(f"Failed to load commands due to {e.__class__}: {e}")
+        return
+    await ctx.send("Complete")
+
+
+@client.command(name="dev-sync", aliases=["dsync"], hidden=True)
+@commands.is_owner()
+async def dev_sync(ctx: commands.Context):
+    """Sync current command tree to dev discord server"""
+    client.tree.copy_global_to(guild=DEBUG_SERVER)
+    await client.tree.sync(guild=DEBUG_SERVER)
+    await ctx.send("Synced global command tree to development server")
+
+
+@client.command(name="global-sync", hidden=True)
+@commands.is_owner()
+async def global_sync(ctx: commands.Context):
+    """Sync current command tree to dev discord server"""
+    await ctx.send("Initiating global sync...")
+    await client.tree.sync()
+    await ctx.reply(f"Synced global command tree to development server", mention_author=True)
+
+
+@reload.error
+@dev_sync.error
+@global_sync.error
+async def re_err(ctx: commands.Context, err: Exception):
+    """Likely a permissions error."""
+    if isinstance(err, commands.CheckFailure):
+        bot_logger.info(
+            "%s (id %d) attempted to use owner-only function.",
+            ctx.author.name,
+            ctx.author.id,
+        )
+    else:
+        bot_logger.error(
+            "%s running %s: %s",
+            err.__class__.__name__,
+            ctx.command.name if ctx.command else "Unknown Command",
+            err
+        )
 
 
 @client.event
-async def on_message(message):
+async def on_message(message: discord.Message):
     if message.author == client.user:
         return
     await client.process_commands(message)
 
 
-@client.command(aliases=["h"])
-async def help(ctx):
-    embed = discord.Embed(
-        title=f"Bot prefix: `{PREFIX}`",
-        description=f"Role/channel/category duplicator bot. Note that command "
-                    "execution requires **Server Moderator** or **Server Moderator "
-                    "In-Training** role.",
-        color=0xB2558D,
-    )
-    embed.add_field(
-        name=f"`{PREFIX}erase some channel category`",
-        value=f"_To be used quarterly._"
-               "\nErases channel category. Deletes the role associated with the "
-               "category."
-               "\n_Note: the category must end with `[ARCHIVED]`._",
-        inline=False,
-    )
-    embed.add_field(
-        name=f"`{PREFIX}archive some channel category`",
-        value=f"_To be used quarterly._"
-               "\nMoves category to bottom of list and appends "
-               "`[ARCHIVED]` to its name, enabling it to be deleted later. "
-               "Deletes the role associated with the category. "
-               "\n_Note: the category must start with `9` or `PHY`, and it "
-               "must not contain the string `GLOBAL`._",
-        inline=False,
-    )
-    embed.add_field(
-        name=f"`{PREFIX}create some channel category`",
-        value=f"_To be used quarterly._"
-               "\nCreates a custom category and role.",
-        inline=False,
-    )
-    embed.add_field(
-        name=f"`{PREFIX}strip`",
-        value=f"_To be used quarterly._"
-               "\nStrips roles `9A`, `9B`, `9C`, `9D`, and `9H` from "
-               "everyone.",
-        inline=False,
-    )
-    embed.add_field(
-        name=f"`{PREFIX}find some role`",
-        value=f"Shows a list of people with the specified role.",
-        inline=False,
-    )
-    embed.add_field(
-        name=f"`{PREFIX}duplicate some channel category`",
-        value=f"Duplicates channel category and its channels and "
-               "roles/permissions. To be used only when a certain professor is "
-               "teaching the same class this quarter as last quarter.",
-        inline=False,
-    )
-    embed.set_footer(text="Contact radix.sh with issues.")
-    return await ctx.send(embed=embed)
+async def main():
+    async with client:
+        try:
+            await client.load_extension("transition_commands")
+        except Exception as e:
+            print(f"Failed to load commands due to {e.__class__}: {e}")
+        await client.start(TOKEN)
 
 
-def _find_match(needle, haystack):
-    for category in haystack:
-        if needle.lower() == category.name.lower():
-            return category
-
-def _is_protected(category):
-    return "global" in category.name.lower() or (
-            not category.name.startswith("9") 
-            and not category.name.lower().startswith("phy")
-            )
-
-async def _delete_role(role_name, ctx):
-    # Just in case the user sent "9B Mitchell" like the category name
-    role_name = role_name.replace(" ", "-")
-
-    # _find_match() is not case-sensitive
-    role = _find_match(role_name, ctx.guild.roles)
-    try:
-        await role.delete()
-        await ctx.send(f'Deleted role "{role_name}"')
-    except: 
-        await ctx.send(f'Role not found :(')
-
-
-@client.command(aliases=["remove", "delete", "purge", "nuke"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
-async def erase(ctx, *, arg):
-    if not arg:
-        return await ctx.send("Error: what category are you trying to erase?")
-
-    if arg == "this":
-        to_erase = ctx.channel.category
-    else:
-        to_erase = _find_match(arg, ctx.guild.categories)
-        if not to_erase:
-            return await ctx.send(f"No such category found")
-
-    if _is_protected(to_erase) or "archive" not in to_erase.name.lower():
-        return await ctx.send(f"Illegal!")
-
-    for c in to_erase.channels:
-        await c.delete()
-    await to_erase.delete()
-
-    # Quietly fail if the channel in which the command was sent has been deleted
-    if arg != "this":
-        await ctx.send(f"Successfully deleted category {to_erase.name}")
-
-    # Attempt to delete the associated role, and quietly fail if impossible
-    try:
-        role_to_erase = to_erase.name.replace(" [ARCHIVED]", "").strip()
-        await _delete_role(role_to_erase, ctx)
-    except Exception as e:
-        print(e)
-        await ctx.send(f'Something went wrong trying to delete the role '
-                        'associated with this category')
-
-
-@client.command(aliases=["hide", "shelve"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
-async def archive(ctx, *, arg):
-    if not arg:
-        return await ctx.send("Error: what category are you trying to archive?")
-
-    if arg == "this":
-        # We choose the category that the command message was sent in
-        to_archive = ctx.channel.category
-    else:
-        # We look for the matching category and choose any match
-        to_archive = _find_match(arg, ctx.guild.categories)
-        if not to_archive:
-            return await ctx.send(f"No such category found")
-
-    # We are only allowed to delete categories whose names start with "9" (i.e.,
-    # are in the format 9C Mitchell).
-    if _is_protected(to_archive):
-        return await ctx.send(f"Illegal!")
-
-    # Place the new category before the first category with [ARCHIVED] in its
-    # name
-    pos = len(ctx.guild.categories)
-    for category in ctx.guild.categories:
-        if "[archived]" in category.name.lower():
-            pos = ctx.guild.categories.index(category) - 1
-            break
-    await to_archive.edit(name=f"{str(to_archive)} [ARCHIVED]", position=pos)
-
-    # Attempt to delete the associated role, and quietly fail if impossible
-    try:
-        role_to_erase = to_archive.name.replace(" [ARCHIVED]", "").strip()
-        await _delete_role(role_to_erase, ctx)
-    except Exception as e:
-        print(e)
-        await ctx.send(f'Something went wrong trying to delete the role '
-                        'associated with this category')
-
-    return await ctx.send("Done :3")
-
-
-@client.command(aliases=["add"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
-async def create(ctx, *, name=None):
-    if not name:
-        return await ctx.send("Error: what category are you trying to create?")
-
-    # Transform "9c mitchell" to "9C Mitchell" for channel name
-    name = [letter.capitalize() for letter in name.split(" ")]
-    name[0] = name[0].upper() 
-    name = " ".join(name)
-   
-    # Create corresponding role
-    hyphenated_name = name.replace(" ", "-")
-    new_role = await ctx.guild.create_role(name=hyphenated_name)
-
-    # https://stackoverflow.com/questions/64528917/adding-channel-overwrites-for-user-in-discord-py
-    # https://stackoverflow.com/questions/63975108/creating-a-category-in-discordpy-with-permissions-that-only-a-specific-role-can
-    # Hide this category from view by default
-    pleb_overwrite = discord.PermissionOverwrite()
-    pleb_overwrite.read_messages = False
-    pleb_overwrite.send_messages = False
-    # But allow those with the new role to see it
-    patrician_overwrite = discord.PermissionOverwrite()
-    patrician_overwrite.read_messages = True
-    patrician_overwrite.send_messages = True
-    overwrites = {
-            ctx.guild.default_role: pleb_overwrite, 
-            new_role: patrician_overwrite 
-            }
-
-    # Place the new category before the first category that has [ARCHIVED] in
-    # its name
-    pos = len(ctx.guild.categories)
-    for category in ctx.guild.categories:
-        if "[archived]" in category.name.lower():
-            pos = ctx.guild.categories.index(category) - 1
-            break
-
-    # Create the category
-    await ctx.send(f"Creating new category {name}")
-    new_category = await ctx.guild.create_category(
-        name=name, overwrites=overwrites, position=pos
-    )
-
-    # Populate the new category with channels
-    await new_category.create_text_channel("announcements")
-    await new_category.create_text_channel("general")
-    await new_category.create_text_channel("homework")
-    await new_category.create_text_channel("discussion")
-    await new_category.create_voice_channel(name)
-
-    return await ctx.send("Done :3")
-
-
-@client.command(aliases=[])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
-async def strip(ctx):
-    roles_to_strip = ["9A", "9B", "9C", "9D", "9H"]
-    roles = []
-    for role in roles_to_strip:
-        roles.append(_find_match(role, ctx.guild.roles))
-
-    # Now the list is full of actual roles!
-    count = 0
-    
-    # https://www.reddit.com/r/discordapp/comments/8yvq4g/get_all_users_with_a_role_using_discordpy/
-    for member in ctx.guild.members:
-        for role in member.roles:
-            if role.name in roles:
-                await member.remove_roles(role)
-                count += 1
-    # for role in roles:
-    #     for member in role.members:
-    #         await member.remove_roles(role)
-    #         count += 1
-    return await ctx.send(f"Removed roles {', '.join(roles_to_strip)} from {count} members :)")
-
-
-@client.command(aliases=["list"])
-async def find(ctx, *, role_name):
-    if not role_name:
-        return await ctx.send(f"Error: what role are you trying to "
-                "investigate?")
-
-    role_name = role_name.lower()
-   
-    # role = None
-    # for real_role in ctx.guild.roles:
-    #     if real_role.name.lower() == role_name:
-    #         role = real_role
-    #         break
-    role = _find_match(role_name, ctx.guild.roles)
-    if role is None:
-        return await ctx.send("That role does not exist!")
-
-    if not role.members:
-        return await ctx.send(f"No one with that role!")
-
-    long_list = [f'People with role `{role_name}`:']
-    for person in role.members:
-        long_list.append(str(person))
-    paginator = commands.Paginator()
-    for line in long_list:
-        if len(line) + len(paginator) > 2000:
-            paginator.close_page()
-        paginator.add_line(line)
-    for page in paginator.pages:
-        await ctx.send(page)
-
-
-@client.command(aliases=["dup", "clone"])
-@commands.has_any_role("Server Moderator", "Server Moderator In-Training")
-async def duplicate(ctx, *, arg):
-    old = ""
-    stop = True
-    for category in ctx.guild.categories:
-        if arg.lower() == category.name.lower():
-            old = category
-            stop = False
-            break
-    if stop:
-        return await ctx.send(f"No such category found")
-
-    # Copy the old category's roles/perms to the new category
-    new = await ctx.guild.create_category(
-        f"{old.name}", overwrites=old.overwrites, position=old.position
-    )
-
-    for c in old.channels:
-        if not c.permissions_synced:
-            overwrites = c.overwrites
-        else:
-            overwrites = old.overwrites
-
-        clone = await c.clone()
-        await clone.edit(category=new)
-
-    await old.edit(name=f"{old.name} [ARCHIVE]", position=1000)
-
-    return await ctx.send("Done :3")
-
-
-client.run(TOKEN)
+if __name__ == "__main__":
+    asyncio.run(main())
