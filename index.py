@@ -20,13 +20,20 @@ base_logger.setLevel(logging.INFO)
 
 file_handler = logging.FileHandler("discord.log")
 file_formatter = logging.Formatter(
-    "[%(asctime).23s] [%(levelname)] %(name)s | %(message)s", datefmt="%Y-%M-%d:%H:%M:%S"
+    # fmt="[%(asctime).23s] [%(levelname)] %(name)s | %(message)s", 
+    fmt="[{asctime}] [{levelname}] {name} | {message}", 
+    datefmt="%Y-%M-%d:%H:%M:%S",
+    style='{'
 )
 file_handler.setFormatter(file_formatter)
 
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.WARNING)
-console_formatter = logging.Formatter("[%(levelname)] %(name)s | %(message)s")
+# console_formatter = logging.Formatter("[%(levelname)] %(name)s | %(message)s")
+console_formatter = logging.Formatter(
+    fmt="[{levelname}] {name} | {message}",
+    style='{'
+)
 console_handler.setFormatter(console_formatter)
 
 base_logger.addHandler(file_handler)
@@ -74,7 +81,7 @@ async def dev_sync(ctx: commands.Context):
     """Sync current command tree to dev discord server"""
     client.tree.copy_global_to(guild=DEBUG_SERVER)
     await client.tree.sync(guild=DEBUG_SERVER)
-    await ctx.send("Synced global command tree to development server")
+    await ctx.send("Synced global command tree to development server", mention_author=True)
 
 
 @client.command(name="global-sync", hidden=True)
@@ -83,7 +90,7 @@ async def global_sync(ctx: commands.Context):
     """Sync current command tree to all of discord"""
     await ctx.send("Initiating global sync...")
     await client.tree.sync()
-    await ctx.reply(f"Synced global command tree to development server", mention_author=True)
+    await ctx.reply(f"Synced global command tree to all servers", mention_author=True)
 
 
 @reload.error
