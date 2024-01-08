@@ -110,8 +110,10 @@ PREFIX = ','
 DEBUG_ID = '123456789'
 ```
 
-Install discordpy if necessary (`python3 -m pip install discord`) before running
-`python3 index.py`.
+Install discordpy if necessary (`python3 -m pip install discord`).
+
+The owner of the bot can sync commands by @ing the bot with command `dev-sync` 
+or `global-sync`.
 
 Note: Nothing, not even granting every single other permission, was enough for
 the bot to function without admin permissions.
