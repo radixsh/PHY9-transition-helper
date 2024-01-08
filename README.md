@@ -40,12 +40,12 @@ This checklist was last updated 7 January 2024.
 
 ### Bot Commands
 1. Erase archived channels from two quarters ago using `/erase`.
-     a. `/erase 9A Mitchell [Archived]`
+     - `/erase 9A Mitchell [Archived]`
 2. Archive channels from last quarter using `archive`.
-     a. `/archive 9B Mitchell`
+     - `/archive 9B Mitchell`
 3. Remove existing `9A`, `9B`, etc. roles from server members using `/strip`
 4. Create categories for new courses with `create`.
-     a. `/create 9C Mitchell`
+     - `/create 9C Mitchell`
 
 ### Reaction Role Updates
 The server's reaction roles are set up using [Carl-bot](https://carl.gg). To
@@ -67,7 +67,7 @@ you will find the previous quarter's reaction roles.
      - Remove existing reactions from the message.
      - Remove reaction roles set up in Carl-bot.
      - Edit (or remove and resend) the existing message in this section channel
-       to show available sections this quarter (remember, we only care about
+       to show available sections this quarter (we only care about
        individual professors, not individual professors' individual discussion
        sections).
      - Add reaction roles in Carl-bot for each section.
