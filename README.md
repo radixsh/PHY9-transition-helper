@@ -10,14 +10,14 @@ Slash commands have been implemented.
 The main requirement for server transition (other than creating the new
 quarter's channels) is that we preserve the previous quarter's channels in case
 of academic misconduct concerns, as anything arising at the end of a quarter can
-take some time to process. This means that we actually delete channels on a one
+take some time to process. This means that we delete channels on a one
 quarter delay. For example, the transition to Spring 2023 would
 involve deleting the (archived) Fall 2022 channels, archiving the Winter 2023
 channels, and creating new Spring 2023 channels.
 
 
 ## Server Transition Checklist
-This checklist was last updated 28 September 2023.
+This checklist was last updated 7 January 2024.
 
 1. Send a message in the announcements channel saying that we are currently in
    the process of transitioning the server for the next quarter. This message
@@ -40,12 +40,12 @@ This checklist was last updated 28 September 2023.
 
 ### Bot Commands
 1. Erase archived channels from two quarters ago using `/erase`.
-    a. `/erase 9A Mitchell [Archived]`
+     a. `/erase 9A Mitchell [Archived]`
 2. Archive channels from last quarter using `archive`.
-    a. `/archive 9B Mitchell`
+     a. `/archive 9B Mitchell`
 3. Remove existing `9A`, `9B`, etc. roles from server members using `/strip`
 4. Create categories for new courses with `create`.
-    a. `/create 9C Mitchell`
+     a. `/create 9C Mitchell`
 
 ### Reaction Role Updates
 The server's reaction roles are set up using [Carl-bot](https://carl.gg). To
@@ -64,14 +64,14 @@ you will find the previous quarter's reaction roles.
    people to easily click on them. Please do so in the order that the message in
    the channel shows.
 5. For each section being taught other than `PHY 9D`:
-    a. Remove existing reactions from the message.
-    b. Remove reaction roles set up in Carl-bot.
-    c. Edit (or remove and resend) the existing message in this section channel
+     - Remove existing reactions from the message.
+     - Remove reaction roles set up in Carl-bot.
+     - Edit (or remove and resend) the existing message in this section channel
        to show available sections this quarter (remember, we only care about
        individual professors, not individual professors' individual discussion
        sections).
-    d. Add reaction roles in Carl-bot for each section.
-    e. React with each reaction on the message, again in the order that the
+     - Add reaction roles in Carl-bot for each section.
+     - React with each reaction on the message, again in the order that the
        professors appear.
 6. For `PHY 9D`, if it is being offered, make sure the global channels are
    working.
@@ -91,15 +91,9 @@ you will find the previous quarter's reaction roles.
   Deletes the role associated with the category.
     * Note: the category must start with `9` or `PHY`, and it must not
       contain the string `GLOBAL`.
-* `strip`: Strips roles `9A`, `9B`, `9C`, `9D`, and `9H` from everyone.
-* `create some new channel category`: Creates a custom category and a matching
+* `/strip`: Strips roles `9A`, `9B`, `9C`, `9D`, and `9H` from everyone.
+* `/create some new channel category`: Creates a custom category and a matching
   custom role, and limits the category to be visible only to that role.
-
-## Other commands that may be useful
-* `find some role`: Shows a list of people with the specified role.
-* `duplicate some existing channel category`: Duplicates a channel category
-  and its channels and roles/permissions. To be used only when a certain
-  professor is teaching the same class this quarter as last quarter.
 
 
 ## Technologies used
@@ -113,6 +107,7 @@ To get started, get a bot token and create an `env.py`:
 ```py
 TOKEN = 'your-discord-bot-token-here'
 PREFIX = ','
+DEBUG_ID = '123456789'
 ```
 
 Install discordpy if necessary (`python3 -m pip install discord`) before running

@@ -106,19 +106,6 @@ class TransitionCommands(commands.Cog):
             "everyone.",
             inline=False,
         )
-        # I think we remove this?
-        # embed.add_field(
-        #     name=f"`{PREFIX}find some role`",
-        #     value=f"Shows a list of people with the specified role.",
-        #     inline=False,
-        # )
-        embed.add_field(
-            name=f"`{PREFIX}duplicate some channel category`",
-            value=f"Duplicates channel category and its channels and "
-            "roles/permissions. To be used only when a certain professor is "
-            "teaching the same class this quarter as last quarter.",
-            inline=False,
-        )
         embed.set_footer(text="Contact radix.sh with issues.")
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -331,30 +318,6 @@ class TransitionCommands(commands.Cog):
             (await interaction.original_response()).id,
             content=response_str,
         )
-
-    @commands.command(aliases=["list"])
-    async def find(self, ctx: commands.Context, *, role_name: Optional[str]):
-        if role_name is None or ctx.guild is None:
-            return await ctx.send(f"Error: what role are you trying to " "investigate?")
-        role_name = role_name.lower()
-
-        role = self.match_case_insensitive_name(role_name, ctx.guild.roles)
-        if role is None:
-            return await ctx.send("That role does not exist!")
-
-        if not role.members:
-            return await ctx.send(f"No one with that role!")
-
-        long_list = [f"People with role `{role_name}`:"]
-        for person in role.members:
-            long_list.append(str(person))
-        paginator = commands.Paginator()
-        for line in long_list:
-            if len(line) + len(paginator) > 2000:
-                paginator.close_page()
-            paginator.add_line(line)
-        for page in paginator.pages:
-            await ctx.send(page)
 
 
 async def setup(bot: commands.Bot):
